@@ -403,7 +403,7 @@
 
   <!-- Email Preview & Confirmation Modal -->
   <div class="modal-overlay" id="emailModalOverlay">
-    <div class="modal-box modal-box-narrow">
+    <div class="modal-box" style="max-width: 740px;">
       <div class="modal-header">
         <span class="modal-header-title" id="confirmDecisionTitle">Confirm Decision & Send Email</span>
         <button class="modal-close-btn" onclick="closeEmailModal()">✕</button>
@@ -415,39 +415,121 @@
           <strong id="emailRecipient">student@jru.edu</strong>
         </div>
 
-        <!-- Dynamic conditional input fields -->
-        <div class="form-group" id="inputNextStepsGroup" style="display: none;">
-          <label>Next Steps for Acceptance</label>
-          <input type="text" id="inputNextSteps" class="form-control"
-            placeholder="Join Discord link or orientation schedule..." oninput="refreshEmailPreview()" />
+        <!-- Mode Tabs: Compose vs Live Preview -->
+        <div class="modal-tab-strip">
+          <button type="button" class="modal-tab-btn active" id="tabBtnCompose" onclick="switchEmailModalTab('compose')">📝 Compose & Attachments</button>
+          <button type="button" class="modal-tab-btn" id="tabBtnPreview" onclick="switchEmailModalTab('preview')">👁️ Live Email Preview</button>
         </div>
 
-        <div class="form-group" id="inputRevisionGroup" style="display: none;">
-          <label>Specific Incomplete / Weak Answers to Revise</label>
-          <textarea id="inputRevisionNotes" class="email-body-editor email-body-editor-short"
-            placeholder="Please clarify why you want to join..." oninput="refreshEmailPreview()"></textarea>
-          <div class="form-group">
-            <label>Revision Deadline (optional)</label>
-            <input type="text" id="inputRevisionDeadline" class="form-control" placeholder="e.g. 3 days from now"
+        <!-- TAB 1: Compose & Assets -->
+        <div id="emailComposeTab">
+          <!-- Banners Selection Row -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="selectHeaderBanner">Header Banner Graphic</label>
+              <select id="selectHeaderBanner" class="filter-select" onchange="onHeaderBannerChange()" style="width: 100%;">
+                <option value="/assets/email-banners/AWS-Banner.png" selected>AWS-Banner.png (Default)</option>
+                <option value="none">No Header Banner</option>
+                <option value="custom">Custom Image URL...</option>
+              </select>
+              <input type="text" id="inputCustomHeaderBanner" class="form-control" placeholder="https://..." style="display: none; margin-top: 0.4rem;" oninput="refreshEmailPreview()" />
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="selectFooterBanner">Officer Footer Banner</label>
+              <select id="selectFooterBanner" class="filter-select" onchange="onFooterBannerChange()" style="width: 100%;">
+                <option value="/assets/email-banners/Khobe Customized footer.png" selected>Khobe Clayne O. Lolong (Khobe Customized footer.png)</option>
+                <option value="/assets/email-banners/MiggyCustomized footer.png">Miggy (MiggyCustomized footer.png)</option>
+                <option value="/assets/email-banners/Asliah Gubat Banner.png">Asliah Gubat (Asliah Gubat Banner.png)</option>
+                <option value="/assets/email-banners/Dominic Mangabat Banner.png">Dominic Mangabat (Dominic Mangabat Banner.png)</option>
+                <option value="/assets/email-banners/Ichieh Customized footer.png">Ichieh (Ichieh Customized footer.png)</option>
+                <option value="/assets/email-banners/Jomira Feonna Moreno Banner.png">Jomira Feonna Moreno (Jomira Feonna Moreno Banner.png)</option>
+                <option value="/assets/email-banners/Keith Customized footer.png">Keith (Keith Customized footer.png)</option>
+                <option value="/assets/email-banners/Sean Customized footer.png">Sean (Sean Customized footer.png)</option>
+                <option value="/assets/email-banners/Yhatch Junio Banner.png">Yhatch Junio (Yhatch Junio Banner.png)</option>
+                <option value="none">No Footer Banner</option>
+                <option value="custom">Custom Image URL...</option>
+              </select>
+              <input type="text" id="inputCustomFooterBanner" class="form-control" placeholder="https://..." style="display: none; margin-top: 0.4rem;" oninput="refreshEmailPreview()" />
+            </div>
+          </div>
+
+          <!-- Dynamic conditional input fields -->
+          <div class="form-group" id="inputNextStepsGroup" style="display: none;">
+            <label>Next Steps for Acceptance</label>
+            <input type="text" id="inputNextSteps" class="form-control"
+              placeholder="Join Discord link or orientation schedule..." oninput="refreshEmailPreview()" />
+          </div>
+
+          <!-- Group Chats & QR Uploads (Visible on Approval) -->
+          <div id="inputAcceptanceAssetsGroup" style="display: none; background: rgba(255,153,0,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1rem;">
+            <h4 style="font-size: 0.82rem; font-weight: 600; margin-bottom: 0.65rem; color: var(--aws-orange);">Group Chats & QR Code Attachments</h4>
+            
+            <div class="form-group">
+              <label>General Group Chat Link</label>
+              <input type="text" id="inputGeneralChatLink" class="form-control" placeholder="https://m.me/j/AbYQ0COIMmBld5Rc/" value="https://m.me/j/AbYQ0COIMmBld5Rc/" oninput="refreshEmailPreview()" />
+              <div class="qr-upload-row">
+                <label class="btn-qr-upload">
+                  📷 Attach General Chat QR Image
+                  <input type="file" id="fileGeneralQr" accept="image/*" style="display: none;" onchange="handleQrUpload(event, 'general')" />
+                </label>
+                <div id="previewGeneralQr" class="qr-preview-chip" style="display: none;">
+                  <img id="imgGeneralQrThumb" src="" alt="General QR" />
+                  <span>QR Attached</span>
+                  <button type="button" class="btn-remove-qr" onclick="removeQr('general')">✕</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label id="labelDivisionChat">Division Group Chat Link</label>
+              <input type="text" id="inputDivisionChatLink" class="form-control" placeholder="https://m.me/j/..." oninput="refreshEmailPreview()" />
+              <div class="qr-upload-row">
+                <label class="btn-qr-upload">
+                  📷 Attach Division Chat QR Image
+                  <input type="file" id="fileDivisionQr" accept="image/*" style="display: none;" onchange="handleQrUpload(event, 'division')" />
+                </label>
+                <div id="previewDivisionQr" class="qr-preview-chip" style="display: none;">
+                  <img id="imgDivisionQrThumb" src="" alt="Division QR" />
+                  <span>QR Attached</span>
+                  <button type="button" class="btn-remove-qr" onclick="removeQr('division')">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group" id="inputRevisionGroup" style="display: none;">
+            <label>Specific Incomplete / Weak Answers to Revise</label>
+            <textarea id="inputRevisionNotes" class="email-body-editor email-body-editor-short"
+              placeholder="Please clarify why you want to join..." oninput="refreshEmailPreview()"></textarea>
+            <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 0;">
+              <label>Revision Deadline (optional)</label>
+              <input type="text" id="inputRevisionDeadline" class="form-control" placeholder="e.g. 3 days from now"
+                oninput="refreshEmailPreview()" />
+            </div>
+          </div>
+
+          <div class="form-group" id="inputDeclineGroup" style="display: none;">
+            <label>Decline Reason Code (optional)</label>
+            <input type="text" id="inputDeclineReason" class="form-control" placeholder="Due to team capacity limits..."
               oninput="refreshEmailPreview()" />
           </div>
+
+          <div class="email-preview-box">
+            <div class="form-group">
+              <label>Subject Line</label>
+              <input type="text" id="emailSubject" class="form-control" oninput="updateVisualPreview()" />
+            </div>
+            <div class="form-group">
+              <label>Message Text (Editable)</label>
+              <textarea id="emailBody" class="email-body-editor" oninput="updateVisualPreview()"></textarea>
+            </div>
+          </div>
         </div>
 
-        <div class="form-group" id="inputDeclineGroup" style="display: none;">
-          <label>Decline Reason Code (optional)</label>
-          <input type="text" id="inputDeclineReason" class="form-control" placeholder="Due to team capacity limits..."
-            oninput="refreshEmailPreview()" />
-        </div>
-
-        <div class="email-preview-box">
-          <div class="form-group">
-            <label>Preview Subject</label>
-            <input type="text" id="emailSubject" class="form-control" />
-          </div>
-          <div class="form-group">
-            <label>Preview Body (Editable)</label>
-            <textarea id="emailBody" class="email-body-editor"></textarea>
-          </div>
+        <!-- TAB 2: Live Visual Preview -->
+        <div id="emailVisualPreviewContainer" class="email-visual-preview-wrap" style="display: none;">
+          <iframe id="iframeEmailPreview" class="email-preview-iframe" title="Email Live Preview"></iframe>
         </div>
       </div>
 

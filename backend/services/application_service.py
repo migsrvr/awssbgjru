@@ -8,6 +8,7 @@ from backend.services.audit_service import log_action
 from backend.services.email_service import (
     preview_email,
     send_email,
+    build_html_email,
     get_template,
 )
 
@@ -268,6 +269,12 @@ def record_decision(
     decline_reason: Optional[str] = None,
     custom_subject: Optional[str] = None,
     custom_body: Optional[str] = None,
+    header_banner_url: Optional[str] = None,
+    footer_banner_url: Optional[str] = None,
+    general_chat_link: Optional[str] = None,
+    general_qr_base64: Optional[str] = None,
+    division_chat_link: Optional[str] = None,
+    division_qr_base64: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Records a final or pending membership decision, updates application status,
@@ -324,7 +331,7 @@ def record_decision(
             body = custom_body
         else:
             # Generate from template
-            subj, body, _ = preview_email(
+            subj, body, _, _ = preview_email(
                 applicant=app,
                 template_id=template_id,
                 next_steps=next_steps,
@@ -332,12 +339,31 @@ def record_decision(
                 revision_deadline=reg_updates.get("revision_deadline"),
                 decline_reason=decline_reason or reason_code,
                 revision_token=revision_token,
+                header_banner_url=header_banner_url,
+                footer_banner_url=footer_banner_url,
+                general_chat_link=general_chat_link,
+                general_qr_base64=general_qr_base64,
+                division_chat_link=division_chat_link,
+                division_qr_base64=division_qr_base64,
             )
+
+        html_body = build_html_email(
+            subject=subj,
+            body_text=body,
+            header_banner_url=header_banner_url,
+            footer_banner_url=footer_banner_url,
+            general_chat_link=general_chat_link,
+            general_qr_base64=general_qr_base64,
+            division_chat_link=division_chat_link,
+            division_qr_base64=division_qr_base64,
+            division_name=app.get("division_name"),
+        )
 
         email_result = send_email(
             recipient_email=app["email"],
             subject=subj,
             body=body,
+            html_body=html_body,
             registration_id=application_id,
             template_id=template_id,
             sender_id=officer_id,

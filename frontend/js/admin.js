@@ -671,10 +671,19 @@ window.submitQuickNote = function () {
   }).catch((err) => showToast(err.message || "Failed to add note", "error"));
 };
 
-// ---------------- Decision Flow & Email Preview ----------------
+// ---------------- Decision Flow, Banners & Email Preview ----------------
+state.generalQrBase64 = "";
+state.divisionQrBase64 = "";
+state.activeEmailTab = "compose";
+
 window.initiateDecision = function (decisionType) {
   if (!state.activeApp) return;
   state.pendingDecision = decisionType;
+
+  // Reset QR attachments and modal view
+  removeQr("general");
+  removeQr("division");
+  switchEmailModalTab("compose");
 
   // Gather rubric scores
   const rubricScores = {};
@@ -702,14 +711,271 @@ window.initiateDecision = function (decisionType) {
   const nextStepsGroup = document.getElementById("inputNextStepsGroup");
   const revNotesGroup = document.getElementById("inputRevisionGroup");
   const declineReasonGroup = document.getElementById("inputDeclineGroup");
+  const acceptanceAssetsGroup = document.getElementById("inputAcceptanceAssetsGroup");
 
   if (nextStepsGroup) nextStepsGroup.style.display = decisionType === "approved" ? "block" : "none";
   if (revNotesGroup) revNotesGroup.style.display = decisionType === "revision_requested" ? "block" : "none";
   if (declineReasonGroup) declineReasonGroup.style.display = decisionType === "declined" ? "block" : "none";
 
+  if (acceptanceAssetsGroup) {
+    acceptanceAssetsGroup.style.display = decisionType === "approved" ? "block" : "none";
+    const divLabel = document.getElementById("labelDivisionChat");
+    if (divLabel && state.activeApp.division_name) {
+      divLabel.textContent = `${state.activeApp.division_name} Group Chat Link`;
+    }
+  }
+
+  // Auto-select footer banner matching logged in officer if found
+  const selectFooter = document.getElementById("selectFooterBanner");
+  if (selectFooter && state.user && state.user.full_name) {
+    const officerLower = state.user.full_name.toLowerCase();
+    const tokens = officerLower.split(/\s+/).filter((t) => t.length > 2);
+    for (const opt of selectFooter.options) {
+      const optValLower = opt.value.toLowerCase();
+      const optTextLower = opt.textContent.toLowerCase();
+      if (tokens.some((t) => optValLower.includes(t) || optTextLower.includes(t))) {
+        selectFooter.value = opt.value;
+        break;
+      }
+    }
+  }
+
   // Fetch preview from backend
   fetchEmailPreview(decisionType);
   document.getElementById("emailModalOverlay").classList.add("active");
+};
+
+function getActiveHeaderBannerUrl() {
+  const select = document.getElementById("selectHeaderBanner");
+  if (!select) return "/assets/email-banners/AWS-Banner.png";
+  if (select.value === "none") return null;
+  if (select.value === "custom") {
+    return document.getElementById("inputCustomHeaderBanner")?.value.trim() || null;
+  }
+  return select.value;
+}
+
+function getActiveFooterBannerUrl() {
+  const select = document.getElementById("selectFooterBanner");
+  if (!select) return "/assets/email-banners/Khobe Customized footer.png";
+  if (select.value === "none") return null;
+  if (select.value === "custom") {
+    return document.getElementById("inputCustomFooterBanner")?.value.trim() || null;
+  }
+  return select.value;
+}
+
+window.onHeaderBannerChange = function () {
+  const select = document.getElementById("selectHeaderBanner");
+  const customInput = document.getElementById("inputCustomHeaderBanner");
+  if (select && customInput) {
+    customInput.style.display = select.value === "custom" ? "block" : "none";
+  }
+  updateVisualPreview();
+};
+
+window.onFooterBannerChange = function () {
+  const select = document.getElementById("selectFooterBanner");
+  const customInput = document.getElementById("inputCustomFooterBanner");
+  if (select && customInput) {
+    customInput.style.display = select.value === "custom" ? "block" : "none";
+  }
+  updateVisualPreview();
+};
+
+window.handleQrUpload = function (event, type) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const dataUrl = e.target.result;
+    if (type === "general") {
+      state.generalQrBase64 = dataUrl;
+      const thumb = document.getElementById("imgGeneralQrThumb");
+      const chip = document.getElementById("previewGeneralQr");
+      if (thumb) thumb.src = dataUrl;
+      if (chip) chip.style.display = "inline-flex";
+    } else {
+      state.divisionQrBase64 = dataUrl;
+      const thumb = document.getElementById("imgDivisionQrThumb");
+      const chip = document.getElementById("previewDivisionQr");
+      if (thumb) thumb.src = dataUrl;
+      if (chip) chip.style.display = "inline-flex";
+    }
+    updateVisualPreview();
+    showToast("QR code image attached!", "success");
+  };
+  reader.readAsDataURL(file);
+};
+
+window.removeQr = function (type) {
+  if (type === "general") {
+    state.generalQrBase64 = "";
+    const chip = document.getElementById("previewGeneralQr");
+    const input = document.getElementById("fileGeneralQr");
+    if (chip) chip.style.display = "none";
+    if (input) input.value = "";
+  } else {
+    state.divisionQrBase64 = "";
+    const chip = document.getElementById("previewDivisionQr");
+    const input = document.getElementById("fileDivisionQr");
+    if (chip) chip.style.display = "none";
+    if (input) input.value = "";
+  }
+  updateVisualPreview();
+};
+
+window.switchEmailModalTab = function (tab) {
+  state.activeEmailTab = tab;
+  const btnCompose = document.getElementById("tabBtnCompose");
+  const btnPreview = document.getElementById("tabBtnPreview");
+  const composeTab = document.getElementById("emailComposeTab");
+  const previewTab = document.getElementById("emailVisualPreviewContainer");
+
+  if (tab === "compose") {
+    if (btnCompose) btnCompose.classList.add("active");
+    if (btnPreview) btnPreview.classList.remove("active");
+    if (composeTab) composeTab.style.display = "block";
+    if (previewTab) previewTab.style.display = "none";
+  } else {
+    if (btnCompose) btnCompose.classList.remove("active");
+    if (btnPreview) btnPreview.classList.add("active");
+    if (composeTab) composeTab.style.display = "none";
+    if (previewTab) previewTab.style.display = "block";
+    updateVisualPreview();
+  }
+};
+
+window.updateVisualPreview = function () {
+  const subject = document.getElementById("emailSubject")?.value || "AWS SBG JRU Notification";
+  const bodyText = document.getElementById("emailBody")?.value || "";
+  const headerBanner = getActiveHeaderBannerUrl();
+  const footerBanner = getActiveFooterBannerUrl();
+  const genLink = document.getElementById("inputGeneralChatLink")?.value.trim() || "";
+  const divLink = document.getElementById("inputDivisionChatLink")?.value.trim() || "";
+  const genQr = state.generalQrBase64 || "";
+  const divQr = state.divisionQrBase64 || "";
+  const rawDiv = state.activeApp ? state.activeApp.division_name : "Division";
+  const divClean = (rawDiv || "Division").replace(/ (Office|Department)$/i, "");
+  const divLabel = `${divClean} Group Chat`;
+
+  let groupChatsHtml = "";
+  if (genLink || divLink || genQr || divQr) {
+    let items = "";
+    if (genLink || genQr) {
+      items += `<div style="margin: 16px 0 24px 0;">`;
+      if (genLink) {
+        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>General Group Chat</em>: <a href="${escapeHtml(genLink)}" style="color: #0073bb; text-decoration: underline;" target="_blank">${escapeHtml(genLink)}</a></p>`;
+      } else {
+        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>General Group Chat</em></p>`;
+      }
+      if (genQr) {
+        items += `<img src="${genQr}" alt="General Group Chat QR Code" width="180" style="width: 180px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; background: #ffffff; display: block; margin-top: 8px;" />`;
+      }
+      items += `</div>`;
+    }
+
+    if (divLink || divQr) {
+      items += `<div style="margin: 16px 0 24px 0;">`;
+      if (divLink) {
+        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>${escapeHtml(divLabel)}</em>: <a href="${escapeHtml(divLink)}" style="color: #0073bb; text-decoration: underline;" target="_blank">${escapeHtml(divLink)}</a></p>`;
+      } else {
+        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>${escapeHtml(divLabel)}</em></p>`;
+      }
+      if (divQr) {
+        items += `<img src="${divQr}" alt="${escapeHtml(divLabel)} QR Code" width="180" style="width: 180px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; background: #ffffff; display: block; margin-top: 8px;" />`;
+      }
+      items += `</div>`;
+    }
+    groupChatsHtml = items;
+  }
+
+  const paragraphs = bodyText.split("\n\n").filter((p) => p.trim());
+  let contentBlocks = [];
+  let chatsInserted = false;
+
+  for (const p of paragraphs) {
+    let pFormatted = escapeHtml(p).replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    if (p.trim().toLowerCase().startsWith("congratulations")) {
+      contentBlocks.push(`<p style="margin: 0 0 16px 0; font-size: 16px; font-weight: bold; color: #1a202c; line-height: 1.5;">${pFormatted}</p>`);
+    } else {
+      contentBlocks.push(`<p style="margin: 0 0 16px 0; font-size: 15px; color: #2d3748; line-height: 1.6;">${pFormatted.replace(/\n/g, "<br />")}</p>`);
+    }
+
+    if (p.toLowerCase().includes("group chats below") && groupChatsHtml && !chatsInserted) {
+      contentBlocks.push(groupChatsHtml);
+      chatsInserted = true;
+    }
+  }
+
+  if (groupChatsHtml && !chatsInserted) {
+    contentBlocks.push(groupChatsHtml);
+  }
+
+  const bodyContentHtml = contentBlocks.join("\n");
+
+  let headerImgHtml = "";
+  if (headerBanner) {
+    const safeHeader = encodeURI(headerBanner);
+    headerImgHtml = `
+      <tr>
+        <td align="center" style="padding: 0;">
+          <img src="${safeHeader}" alt="AWS SBG JRU Chapter Banner" width="600" style="width: 100%; max-width: 600px; height: auto; display: block; border-top-left-radius: 8px; border-top-right-radius: 8px;" />
+        </td>
+      </tr>
+    `;
+  }
+
+  let footerImgHtml = "";
+  if (footerBanner) {
+    const safeFooter = encodeURI(footerBanner);
+    footerImgHtml = `
+      <tr>
+        <td align="center" style="padding: 0;">
+          <img src="${safeFooter}" alt="Officer Sign-off" width="600" style="width: 100%; max-width: 600px; height: auto; display: block; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;" />
+        </td>
+      </tr>
+    `;
+  }
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin: 0; padding: 20px 0; background-color: #f7fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f7fafc;">
+    <tr>
+      <td align="center" style="padding: 10px;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+          ${headerImgHtml}
+          <tr>
+            <td style="padding: 32px 30px 24px 30px; color: #2d3748; font-size: 15px; line-height: 1.6;">
+              ${bodyContentHtml}
+            </td>
+          </tr>
+          ${footerImgHtml}
+        </table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; margin-top: 16px;">
+          <tr>
+            <td align="center" style="font-size: 12px; color: #a0aec0; padding: 10px 20px; line-height: 1.4;">
+              AWS Student Builder Group &bull; Jose Rizal University Chapter<br>
+              <span style="font-size: 11px;">This is an official administrative communication from AWS SBG JRU.</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const iframe = document.getElementById("iframeEmailPreview");
+  if (iframe) {
+    iframe.srcdoc = html;
+  }
 };
 
 function fetchEmailPreview(templateId) {
@@ -733,6 +999,7 @@ function fetchEmailPreview(templateId) {
     .then((preview) => {
       document.getElementById("emailSubject").value = preview.subject;
       document.getElementById("emailBody").value = preview.body;
+      updateVisualPreview();
     })
     .catch((err) => {
       showToast(err.message || "Failed to preview email", "error");
@@ -742,12 +1009,16 @@ function fetchEmailPreview(templateId) {
 window.refreshEmailPreview = function () {
   if (state.pendingDecision) {
     fetchEmailPreview(state.pendingDecision);
+  } else {
+    updateVisualPreview();
   }
 };
 
 window.closeEmailModal = function () {
   document.getElementById("emailModalOverlay").classList.remove("active");
   state.pendingDecision = null;
+  removeQr("general");
+  removeQr("division");
 };
 
 window.confirmAndDispatch = function () {
@@ -764,6 +1035,10 @@ window.confirmAndDispatch = function () {
   const nextSteps = document.getElementById("inputNextSteps")?.value.trim();
   const revisionNotes = document.getElementById("inputRevisionNotes")?.value.trim();
   const revisionDeadline = document.getElementById("inputRevisionDeadline")?.value.trim();
+  const headerBanner = getActiveHeaderBannerUrl();
+  const footerBanner = getActiveFooterBannerUrl();
+  const genLink = document.getElementById("inputGeneralChatLink")?.value.trim();
+  const divLink = document.getElementById("inputDivisionChatLink")?.value.trim();
 
   const payload = {
     decision: state.pendingDecision,
@@ -775,6 +1050,12 @@ window.confirmAndDispatch = function () {
     next_steps: nextSteps,
     revision_notes: revisionNotes,
     revision_deadline: revisionDeadline,
+    header_banner_url: headerBanner,
+    footer_banner_url: footerBanner,
+    general_chat_link: genLink,
+    general_qr_base64: state.generalQrBase64 || undefined,
+    division_chat_link: divLink,
+    division_qr_base64: state.divisionQrBase64 || undefined,
   };
 
   submitDecisionPayload(payload);

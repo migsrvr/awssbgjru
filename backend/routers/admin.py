@@ -218,6 +218,12 @@ async def submit_decision(
         decline_reason=payload.decline_reason,
         custom_subject=payload.custom_subject,
         custom_body=payload.custom_body,
+        header_banner_url=payload.header_banner_url,
+        footer_banner_url=payload.footer_banner_url,
+        general_chat_link=payload.general_chat_link,
+        general_qr_base64=payload.general_qr_base64,
+        division_chat_link=payload.division_chat_link,
+        division_qr_base64=payload.division_qr_base64,
     )
     return res
 
@@ -230,13 +236,19 @@ async def preview_application_email(
 ):
     """Generates a populated preview of an email using the applicant's record and selected template."""
     app = get_application_detail(application_id)
-    subject, body, variables = preview_email(
+    subject, body, variables, html_preview = preview_email(
         applicant=app,
         template_id=payload.template_id,
         next_steps=payload.next_steps,
         revision_notes=payload.revision_notes,
         revision_deadline=payload.revision_deadline,
         decline_reason=payload.decline_reason,
+        header_banner_url=payload.header_banner_url,
+        footer_banner_url=payload.footer_banner_url,
+        general_chat_link=payload.general_chat_link,
+        general_qr_base64=payload.general_qr_base64,
+        division_chat_link=payload.division_chat_link,
+        division_qr_base64=payload.division_qr_base64,
     )
     return EmailPreviewResponse(
         template_id=payload.template_id,
@@ -244,6 +256,7 @@ async def preview_application_email(
         body=body,
         recipient_email=app["email"],
         variables=variables,
+        html_preview=html_preview,
     )
 
 
@@ -259,6 +272,7 @@ async def send_application_email(
         recipient_email=app["email"],
         subject=payload.subject,
         body=payload.body,
+        html_body=payload.html_body,
         registration_id=application_id,
         template_id=payload.template_id,
         sender_id=user.id,

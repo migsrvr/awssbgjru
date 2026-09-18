@@ -17,16 +17,17 @@ class TestAdminServices(unittest.TestCase):
         tmpl = DEFAULT_TEMPLATES["approved"]
         vars_map = {
             "Applicant Name": "Maria Santos",
+            "Role Title": "Creatives Office Member",
+            "Division Name": "Creatives Office",
             "Next Steps": "Join the Discord server and attend orientation this Friday.",
         }
         subject, body = interpolate_template(tmpl, vars_map)
 
-        self.assertIn("Welcome to AWS SBG JRU", subject)
-        self.assertIn("Hi Maria Santos,", body)
-        self.assertIn("Congratulations! Your application to join AWS SBG JRU has been approved.", body)
-        self.assertIn("Join the Discord server and attend orientation this Friday.", body)
+        self.assertIn("Welcome to AWS Student Builder Group - JRU", subject)
+        self.assertIn("Congratulations!", body)
+        self.assertIn("Creatives Office Member", body)
         self.assertNotIn("{{Applicant Name}}", body)
-        self.assertNotIn("{{Next Steps}}", body)
+        self.assertNotIn("{{Role Title}}", body)
 
     def test_email_interpolation_revision_requested(self):
         tmpl = DEFAULT_TEMPLATES["revision_requested"]

@@ -101,6 +101,13 @@ class ApplicationDecisionRequest(BaseModel):
     decline_reason: Optional[str] = None
     custom_subject: Optional[str] = None
     custom_body: Optional[str] = None
+    # Banner and QR customization
+    header_banner_url: Optional[str] = None
+    footer_banner_url: Optional[str] = None
+    general_chat_link: Optional[str] = None
+    general_qr_base64: Optional[str] = None
+    division_chat_link: Optional[str] = None
+    division_qr_base64: Optional[str] = None
 
 
 class EmailPreviewRequest(BaseModel):
@@ -109,6 +116,12 @@ class EmailPreviewRequest(BaseModel):
     revision_notes: Optional[str] = None
     revision_deadline: Optional[str] = None
     decline_reason: Optional[str] = None
+    header_banner_url: Optional[str] = None
+    footer_banner_url: Optional[str] = None
+    general_chat_link: Optional[str] = None
+    general_qr_base64: Optional[str] = None
+    division_chat_link: Optional[str] = None
+    division_qr_base64: Optional[str] = None
 
 
 class EmailPreviewResponse(BaseModel):
@@ -117,12 +130,18 @@ class EmailPreviewResponse(BaseModel):
     body: str
     recipient_email: str
     variables: Dict[str, str]
+    html_preview: Optional[str] = None
 
 
 class EmailSendRequest(BaseModel):
     template_id: Optional[str] = None
     subject: str
     body: str
+    html_body: Optional[str] = None
+    header_banner_url: Optional[str] = None
+    footer_banner_url: Optional[str] = None
+    general_qr_base64: Optional[str] = None
+    division_qr_base64: Optional[str] = None
 
 
 class EmailTemplateItem(BaseModel):
