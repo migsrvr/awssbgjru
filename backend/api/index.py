@@ -16,6 +16,7 @@ if _project_root not in sys.path:
 from backend.registration_availability import (
     DivisionAvailabilityError,
     validate_division_availability,
+    validate_division_eligibility,
 )
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -162,6 +163,18 @@ async def register(request: Request):
             {"error": exc.message, "code": exc.code},
             status_code=exc.status_code,
         )
+
+    try:
+        validate_division_eligibility(division_type, division_name, year)
+    except DivisionAvailabilityError as exc:
+        return JSONResponse(
+            {"error": exc.message, "code": exc.code},
+            status_code=exc.status_code,
+        )
+
+    division_name = data.get("division_name", "")
+    if division_name not in config.VALID_DIVISIONS.get(division_type, set()):
+        return JSONResponse({"error": "Invalid division selection"}, status_code=422)
 
     photo_base64 = data.get("photo_base64", "")
     if photo_base64 and not photo_base64.startswith("data:image/"):

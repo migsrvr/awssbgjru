@@ -3,7 +3,6 @@ function initSidebarNav() {
   if (!items.length) return;
   const sectionMap = {
     members: "section-hero",
-    founders: "section-founders",
     executives: "section-executives",
     associates: "section-associates",
     offices: "section-offices"
@@ -26,7 +25,6 @@ function initIntersectionObserver() {
   if (!sections.length) return;
   const sectionKeyMap = {
     "section-hero": "members",
-    "section-founders": "founders",
     "section-executives": "executives",
     "section-associates": "associates",
     "section-offices": "offices"
@@ -180,7 +178,7 @@ async function initMembers() {
     const response = await fetch("../data/members.json");
     const data = await response.json();
     
-    ["founders", "executives", "associates", "offices"].forEach(sectionKey => {
+    ["executives", "associates", "offices"].forEach(sectionKey => {
       const members = data[sectionKey];
       const sectionEl = document.getElementById(`section-${sectionKey}`);
       if (!sectionEl) return;
@@ -206,10 +204,6 @@ async function initMembers() {
       const subIds = Object.keys(grouped).sort((a, b) => a - b);
       
       const labels = {
-        founders: [
-          "FOUNDERS",
-          "Founded in 2025, AWS Student Builder Group—formerly known as AWS Learning Club — was built on the goal to empower students by providing inclusive educational initiatives, hands-on workshops, and networking opportunities. Adrian Justine R. Evangelista (Founder) and the other Co-Founders combined their knowledge and experience to create solutions that empower students."
-        ],
         executives: [
           "EXECUTIVES",
           "The Executive Board drives the vision and operations of the AWS Student Builder Group, ensuring every initiative aligns with our mission to empower students through cloud technology and innovation."

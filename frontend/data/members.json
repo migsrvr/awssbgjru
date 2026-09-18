@@ -1,111 +1,5 @@
 {
-  "founders": [
-    {
-      "name": "Evangelista, Adrian Justine",
-      "position": "Lead & President, 24–25",
-      "photo": "../assets/members/founders-photos/Adrian Evangelista.webp",
-      "socials": {
-        "linkedin": "https://www.linkedin.com/in/adjsevangelista/",
-        "facebook": "#",
-        "instagram": "#"
-      },
-      "subsection": 1,
-      "role": "Founder"
-    },
-    {
-      "name": "Saturio, Lyndon Kaizer C.",
-      "position": "Co-Founder, 25–26",
-      "photo": "../assets/members/founders-photos/Kaizer Saturio.webp",
-      "socials": {
-        "linkedin": "https://www.linkedin.com/in/lyndon-saturio-80356b275/",
-        "facebook": "https://www.facebook.com/kai.saturio",
-        "instagram": "https://www.instagram.com/galitakosagwapo_/"
-      },
-      "subsection": 3,
-      "role": "Co-Founder"
-    },
-    {
-      "name": "Bautista, Rizelle B.",
-      "position": "CEO/President, 25–26",
-      "photo": "../assets/members/founders-photos/Rizelle Bautista.webp",
-      "socials": {
-        "linkedin": "https://www.linkedin.com/in/rizelle-b-968006286/"
-      },
-      "resume": "../assets/members/founders-photos/resume/Resume_Rizelle_Bautista - Rizelle Bautista.pdf",
-      "portfolio": "https://www.linkedin.com/in/rizelle-b-968006286/",
-      "subsection": 2,
-      "role": "Co-Founder"
-    },
-    {
-      "name": "Gandawali, Albosran",
-      "position": "Vice President–Internal, 25–26",
-      "photo": "../assets/members/founders-photos/Mendoza, Albos.webp",
-      "socials": {
-        "linkedin": "https://www.linkedin.com/in/albosran-gandawali-888b54281/"
-      },
-      "resume": "../assets/members/founders-photos/resume/CV6_ALBOSRAN M GANDAWALI - Albosran Gandawali.pdf",
-      "subsection": 2,
-      "role": "Co-Founder"
-    },
-    {
-      "name": "Hao, Joaquin Alec",
-      "role": "Co-Founder",
-      "position": "Secretary, 25–26",
-      "photo": "../assets/shared/components/AWS-NewLogo.webp",
-      "socials": {},
-      "subsection": 2
-    },
-    {
-      "name": "Rebullar, John Lenard",
-      "position": "Chief Creatives Officer, 24–25",
-      "photo": "../assets/members/founders-photos/Johnlenard Rebullar.webp",
-      "socials": {
-        "linkedin": "http://www.linkedin.com/in/john-lenard-rebullar-9a9682218"
-      },
-      "subsection": 3,
-      "role": "Co-Founder"
-    }
-  ],
   "executives": [
-    {
-      "name": "Bautista, Rizelle B.",
-      "role": "Executive",
-      "position": "CEO/President, 25–26",
-      "photo": "../assets/members/founders-photos/Rizelle Bautista.webp",
-      "socials": {
-        "linkedin": "https://www.linkedin.com/in/rizelle-b-968006286/"
-      },
-      "resume": "../assets/members/founders-photos/resume/Resume_Rizelle_Bautista - Rizelle Bautista.pdf",
-      "portfolio": "https://www.linkedin.com/in/rizelle-b-968006286/",
-      "subsection": 2
-    },
-    {
-      "name": "Gandawali, Albosran",
-      "role": "Executive",
-      "position": "Vice President–Internal, 25–26",
-      "photo": "../assets/members/founders-photos/Mendoza, Albos.webp",
-      "socials": {
-        "linkedin": "https://www.linkedin.com/in/albosran-gandawali-888b54281/"
-      },
-      "resume": "../assets/members/founders-photos/resume/CV6_ALBOSRAN M GANDAWALI - Albosran Gandawali.pdf",
-      "subsection": 2
-    },
-    {
-      "name": "Malabed, Robert Caesar",
-      "role": "Executive",
-      "position": "Vice President–External, 25–26",
-      "photo": "../assets/shared/components/AWS-NewLogo.webp",
-      "socials": {},
-      "subsection": 2
-    },
-    {
-      "name": "Hao, Joaquin Alec",
-      "role": "Executive",
-      "position": "Executive Secretary, 25–26",
-      "photo": "../assets/shared/components/AWS-NewLogo.webp",
-      "socials": {},
-      "subsection": 2
-    },
     {
       "name": "Speirs, Keith Alan",
       "role": "Executive",
@@ -234,18 +128,6 @@
       }
     },
     {
-      "name": "Vergara, Christian",
-      "subsection": 3,
-      "role": "Associate",
-      "position": "Front-End Developer Lead, 26–27",
-      "photo": "../assets/shared/components/AWS-NewLogo.webp",
-      "socials": {
-        "linkedin": "#",
-        "facebook": "#",
-        "instagram": "#"
-      }
-    },
-    {
       "name": "Sederia, Jharell James M.",
       "subsection": 3,
       "role": "Associate",
@@ -319,31 +201,6 @@
       }
     },
     {
-      "name": "Santos, Chauncey",
-      "subsection": 2,
-      "role": "Former Chief of Operations",
-      "position": "Ex. Chief of Operations, 25–26",
-      "photo": "../assets/members/offices-photos/operations/Chauncey, Santos.webp",
-      "socials": {
-        "linkedin": "https://www.linkedin.com/in/chauncey-santos-3945b5415",
-        "facebook": "https://www.facebook.com/chaunnncey",
-        "instagram": "https://www.instagram.com/zzzyri_?utm_source=qr"
-      },
-      "resume": "../assets/members/executives-photos/resume/Chauncey Santos - Resume - Chauncey Santos.pdf",
-      "portfolio": "https://www.linkedin.com/in/chauncey-santos-3945b5415"
-    },
-    {
-      "name": "Sapigao, Bea Elaine",
-      "subsection": 2,
-      "role": "Former Vice Chief of Operations",
-      "position": "Vice Chief of Operations, 25–26",
-      "photo": "../assets/members/offices-photos/operations/Bea Sapigao.webp",
-      "socials": {
-        "linkedin": "http://www.linkedin.com/in/bea-sapigao-991133338"
-      },
-      "resume": "../assets/members/offices-photos/operations/resume/Bea Elaine Sapigao.pdf"
-    },
-    {
       "name": "Marcial, Ellean",
       "subsection": 3,
       "role": "Head of Marketing",
@@ -379,13 +236,6 @@
         "instagram": "https://www.instagram.com/mattmondares/"
       },
       "resume": "../assets/members/associate-photos/resume/Resume_Matt-Mondares (1) - Matt Mondares (1).pdf"
-    },
-    {
-      "name": "Cuisia, Johann",
-      "subsection": 4,
-      "role": "Former Head of Creatives",
-      "position": "Head of Creatives Department, 25–26",
-      "photo": "../assets/members/offices-photos/creatives/Johann.jpg"
     }
   ]
 }

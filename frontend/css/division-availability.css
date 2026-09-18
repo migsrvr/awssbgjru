@@ -34,37 +34,145 @@
   outline-offset: 4px;
 }
 
-.availability-badge {
-  position: absolute;
-  top: -13px;
-  right: -12px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 52px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #b42318;
-  color: #fff;
-  font: 800 11px/1 "Poppins", sans-serif;
-  letter-spacing: 0.08em;
-  box-shadow: 0 4px 10px rgba(96, 18, 12, 0.35);
+.office-pill.year-ineligible {
+  background: #e6e8ec;
+  border-color: #a8adb5;
+  color: #555a62;
+  cursor: not-allowed;
+  box-shadow:
+    inset 0 0 0 999px rgba(31, 41, 55, 0.08),
+    inset 0 4px 10px rgba(31, 41, 55, 0.16),
+    0 3px 8px rgba(31, 41, 55, 0.14);
 }
 
-.availability-badge::before {
-  content: "";
+.office-pill.year-ineligible:hover {
+  background: #e6e8ec;
+  border-color: #a8adb5;
+  color: #555a62;
+  box-shadow:
+    inset 0 0 0 999px rgba(31, 41, 55, 0.08),
+    inset 0 4px 10px rgba(31, 41, 55, 0.16),
+    0 3px 8px rgba(31, 41, 55, 0.14);
+}
+
+.availability-ribbon {
   position: absolute;
-  inset: -5px;
-  z-index: -1;
-  background: #b42318;
-  clip-path: polygon(50% 0%, 60% 8%, 73% 4%, 80% 16%, 94% 16%, 95% 30%, 100% 40%, 92% 50%, 100% 60%, 95% 70%, 94% 84%, 80% 84%, 73% 96%, 60% 92%, 50% 100%, 40% 92%, 27% 96%, 20% 84%, 6% 84%, 5% 70%, 0 60%, 8% 50%, 0 40%, 5% 30%, 6% 16%, 20% 16%, 27% 4%, 40% 8%);
+  top: 50%;
+  right: -12px;
+  z-index: 3;
+  width: 66px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.availability-ribbon img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.availability-ribbon .ribbon-selected {
+  display: none;
+}
+
+.office-pill.selected .availability-ribbon .ribbon-default,
+.sb-pill.selected .availability-ribbon .ribbon-default {
+  display: none;
+}
+
+.office-pill.selected .availability-ribbon .ribbon-selected,
+.sb-pill.selected .availability-ribbon .ribbon-selected {
+  display: block;
+}
+
+.division-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding-right: 42px;
+  text-align: left;
+}
+
+.office-pill {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.office-pill .division-copy {
+  width: 100%;
+  align-items: flex-start;
+}
+
+.division-note {
+  display: none;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.office-pill[data-division="Relations"] .division-note:not(.division-eligibility-note),
+.office-pill[data-division="Creatives"] .division-note:not(.division-eligibility-note) {
+  display: block;
+}
+
+.office-pill.selected .division-note,
+.sb-pill.selected .division-note {
+  display: block;
+}
+
+.office-pill.unavailable-message-visible,
+.sb-pill.unavailable-message-visible,
+.office-pill.eligibility-message-visible {
+  height: auto;
+  min-height: 50px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.office-pill.unavailable-message-visible .division-unavailable-note,
+.sb-pill.unavailable-message-visible .division-unavailable-note {
+  display: block;
+  white-space: normal;
+}
+
+@media (min-width: 768px) {
+  .office-pill.unavailable-message-visible,
+  .sb-pill.unavailable-message-visible,
+  .office-pill.eligibility-message-visible {
+    min-height: 73px;
+  }
+}
+
+.office-pill[data-division="Relations"].selected .division-note {
+  align-self: flex-start;
+  margin-left: 10px;
+}
+
+.office-pill[data-division="Relations"] .division-eligibility-note,
+.office-pill[data-division="Creatives"] .division-eligibility-note,
+.office-pill.eligibility-message-visible .division-eligibility-note {
+  display: block;
+  white-space: normal;
 }
 
 @media (max-width: 767px) {
-  .availability-badge {
-    top: -9px;
-    right: -7px;
-    width: 44px;
+  .availability-ribbon {
+    right: -6px;
+    width: 54px;
+  }
+
+  .division-copy {
+    padding-right: 34px;
+  }
+
+  .division-note {
+    font-size: 10px;
+  }
+
+  .division-unavailable-note {
     font-size: 9px;
   }
 }

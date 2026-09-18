@@ -8,12 +8,25 @@ DIVISION_STATUS = {
         "Media": "full",
     },
     "skillbuilder": {
-        "Software & Web Dev.": "full",
-        "Security": "not_recruiting",
-        "Data Analyst": "open",
-        "Cloud Computing": "open",
-        "Machine Learning & AI": "open",
-        "Advanced Network & Infrastructure": "not_recruiting",
+        "Software & Web Dev.": "open",
+        "Security": "full",
+        "Data Analyst": "full",
+        "Cloud Computing": "full",
+        "Machine Learning & AI": "full",
+        "Advanced Network & Infrastructure": "full",
+    },
+}
+
+DIVISION_ELIGIBILITY = {
+    "office": {
+        "Relations": (
+            {"First Year"},
+            "Relations is open only to 1st year students.",
+        ),
+        "Creatives": (
+            {"First Year", "Second Year"},
+            "Creatives is open only to 1st and 2nd year students.",
+        ),
     },
 }
 
@@ -62,3 +75,17 @@ def validate_division_availability(division_type: str, division_name: str) -> No
             "This team is full! Please choose another!",
             409,
         )
+
+
+def validate_division_eligibility(
+    division_type: str,
+    division_name: str,
+    year: str,
+) -> None:
+    eligibility = DIVISION_ELIGIBILITY.get(division_type, {}).get(division_name)
+    if not eligibility:
+        return
+
+    allowed_years, message = eligibility
+    if year not in allowed_years:
+        raise DivisionAvailabilityError("division_ineligible", message, 422)

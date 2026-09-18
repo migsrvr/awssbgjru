@@ -23,6 +23,17 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 # App URL for emails and links
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
+# Valid registration divisions (must match frontend pill options)
+VALID_DIVISIONS = {
+    "office": {
+        "Relations", "Operations", "Technology", "Creatives", "Marketing", "Media",
+    },
+    "skillbuilder": {
+        "Software & Web Dev.", "Security", "Data Analyst",
+        "Cloud Computing", "Machine Learning & AI", "Advanced Network & Infrastructure",
+    },
+}
+
 # Email
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))

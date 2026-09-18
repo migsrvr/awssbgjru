@@ -15,7 +15,34 @@
     error.dataset.defaultMessage = text?.textContent || "";
   }
 
-  function showUnavailable(errorOrSelector) {
+  function clearInlineUnavailable(pill) {
+    const ownNote = pill?.querySelector?.(".division-unavailable-note");
+    ownNote?.classList?.remove("visible");
+    pill?.classList?.remove("unavailable-message-visible");
+
+    const scope = pill?.parentElement;
+    const notes = scope?.querySelectorAll?.(".division-unavailable-note") || [];
+    notes.forEach((note) => note.classList.remove("visible"));
+
+    const pills = scope?.querySelectorAll?.(".office-pill, .sb-pill") || [];
+    pills.forEach((item) => item.classList.remove("unavailable-message-visible"));
+  }
+
+  function showInlineUnavailable(pill) {
+    const note = pill?.querySelector?.(".division-unavailable-note");
+    if (!note) return false;
+    clearInlineUnavailable(pill);
+    pill.classList.add("unavailable-message-visible");
+    note.classList.add("visible");
+    return true;
+  }
+
+  function showUnavailable(errorOrSelector, pill) {
+    if (showInlineUnavailable(pill)) {
+      resetMessage(errorOrSelector);
+      return;
+    }
+
     const error = typeof errorOrSelector === "string"
       ? document.querySelector(errorOrSelector)
       : errorOrSelector;
@@ -37,12 +64,13 @@
   function bindPill(pill, error) {
     pill.addEventListener("click", (event) => {
       if (!isFullPill(pill)) {
+        clearInlineUnavailable(pill);
         resetMessage(error);
         return;
       }
       event.preventDefault();
       event.stopImmediatePropagation();
-      showUnavailable(error);
+      showUnavailable(error, pill);
     }, true);
   }
 
@@ -54,16 +82,17 @@
 
   function bindSubmit(submit, pills, error) {
     submit?.addEventListener("click", (event) => {
-      const selectedFull = pills.some(
+      const selectedFull = pills.find(
         (pill) => isFullPill(pill) && pill.classList.contains("selected"),
       );
       if (!selectedFull) {
+        pills.forEach(clearInlineUnavailable);
         resetMessage(error);
         return;
       }
       event.preventDefault();
       event.stopImmediatePropagation();
-      showUnavailable(error);
+      showUnavailable(error, selectedFull);
     }, true);
   }
 

@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="../css/header.css" />
     <link rel="stylesheet" href="../css/department.css" />
     <link rel="stylesheet" href="../css/office.css" />
-    <link rel="stylesheet" href="../css/division-availability.css" />
+    <link rel="stylesheet" href="../css/division-availability.css?v=badge-color-20260817" />
     <script defer src="../js/main.js"></script>
     <script defer src="../js/nav.js"></script>
   </head>
@@ -61,17 +61,63 @@
         <div class="office-content">
           <h2 class="office-section-title">OFFICES : Choose a Office Division</h2>
           <div class="office-grid">
-            <button class="office-pill" data-division="Relations">Relations</button>
-            <button class="office-pill" data-division="Operations">Operations</button>
-            <button class="office-pill" data-division="Technology">Technology</button>
-            <button class="office-pill" data-division="Creatives">Creatives</button>
+            <button class="office-pill" data-division="Relations" data-availability="open" data-eligible-years="First Year">
+              <span class="division-copy">
+                <span class="division-label">Relations</span>
+                <span class="division-note">Open for <strong>1st year</strong></span>
+                <span class="division-note division-eligibility-note" role="status" aria-live="polite">Relations is open only to 1st year students.</span>
+              </span>
+              <span class="availability-ribbon" aria-hidden="true">
+                <img class="ribbon-default" src="../assets/registration/ribbons/open.svg" alt="" />
+                <img class="ribbon-selected" src="../assets/registration/ribbons/open-selected.svg" alt="" />
+              </span>
+            </button>
+            <button class="office-pill" data-division="Operations" data-availability="open">
+              <span class="division-copy">
+                <span class="division-label">Operations</span>
+              </span>
+              <span class="availability-ribbon" aria-hidden="true">
+                <img class="ribbon-default" src="../assets/registration/ribbons/open.svg" alt="" />
+                <img class="ribbon-selected" src="../assets/registration/ribbons/open-selected.svg" alt="" />
+              </span>
+            </button>
+            <button class="office-pill" data-division="Technology" data-availability="open">
+              <span class="division-copy">
+                <span class="division-label">Technology</span>
+              </span>
+              <span class="availability-ribbon" aria-hidden="true">
+                <img class="ribbon-default" src="../assets/registration/ribbons/open.svg" alt="" />
+                <img class="ribbon-selected" src="../assets/registration/ribbons/open-selected.svg" alt="" />
+              </span>
+            </button>
+            <button class="office-pill" data-division="Creatives" data-availability="open" data-eligible-years="First Year,Second Year">
+              <span class="division-copy">
+                <span class="division-label">Creatives</span>
+                <span class="division-note">Open for <strong>1st year</strong> and <strong>2nd year</strong></span>
+                <span class="division-note division-eligibility-note" role="status" aria-live="polite">Creatives is open only to 1st and 2nd year students.</span>
+              </span>
+              <span class="availability-ribbon" aria-hidden="true">
+                <img class="ribbon-default" src="../assets/registration/ribbons/open.svg" alt="" />
+                <img class="ribbon-selected" src="../assets/registration/ribbons/open-selected.svg" alt="" />
+              </span>
+            </button>
             <button class="office-pill" data-division="Marketing" data-availability="full" aria-disabled="true">
-              <span class="division-label">Marketing</span>
-              <span class="availability-badge" aria-hidden="true">FULL</span>
+              <span class="division-copy">
+                <span class="division-label">Marketing</span>
+                <span class="division-note division-unavailable-note" role="status" aria-live="polite">This team is full! Please choose another!</span>
+              </span>
+              <span class="availability-ribbon" aria-hidden="true">
+                <img src="../assets/registration/ribbons/full.svg" alt="" />
+              </span>
             </button>
             <button class="office-pill" data-division="Media" data-availability="full" aria-disabled="true">
-              <span class="division-label">Media</span>
-              <span class="availability-badge" aria-hidden="true">FULL</span>
+              <span class="division-copy">
+                <span class="division-label">Media</span>
+                <span class="division-note division-unavailable-note" role="status" aria-live="polite">This team is full! Please choose another!</span>
+              </span>
+              <span class="availability-ribbon" aria-hidden="true">
+                <img src="../assets/registration/ribbons/full.svg" alt="" />
+              </span>
             </button>
           </div>
           <div class="form-error office-error" data-for="office" role="status" aria-live="polite">
@@ -89,7 +135,7 @@
 
       </div>
     </main>
-    <script src="../js/division-availability.js"></script>
-    <script src="../js/office.js"></script>
+    <script src="../js/division-availability.js?v=badge-color-20260817"></script>
+    <script src="../js/office.js?v=badge-color-20260817"></script>
   </body>
 </html>
