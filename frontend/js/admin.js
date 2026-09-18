@@ -914,6 +914,12 @@ function submitDecisionPayload(payload) {
 }
 
 function silentSync() {
+  // Always keep dashboard metrics updated in background
+  fetch(`${API_BASE}/api/v1/admin/metrics`, { headers: getHeaders() })
+    .then((res) => res.json())
+    .then((data) => updateKpiElements(data))
+    .catch(() => {});
+
   if (state.currentView === "queue") {
     const params = new URLSearchParams({
       page: state.page,
