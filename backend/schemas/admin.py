@@ -107,6 +107,7 @@ class ApplicationDecisionRequest(BaseModel):
     general_chat_link: Optional[str] = None
     general_qr_base64: Optional[str] = None
     division_chat_link: Optional[str] = None
+    division_chat_label: Optional[str] = None
     division_qr_base64: Optional[str] = None
 
 
@@ -121,6 +122,7 @@ class EmailPreviewRequest(BaseModel):
     general_chat_link: Optional[str] = None
     general_qr_base64: Optional[str] = None
     division_chat_link: Optional[str] = None
+    division_chat_label: Optional[str] = None
     division_qr_base64: Optional[str] = None
 
 
@@ -142,6 +144,7 @@ class EmailSendRequest(BaseModel):
     footer_banner_url: Optional[str] = None
     general_qr_base64: Optional[str] = None
     division_qr_base64: Optional[str] = None
+    division_chat_label: Optional[str] = None
 
 
 class EmailTemplateItem(BaseModel):

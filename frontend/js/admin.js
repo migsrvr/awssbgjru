@@ -719,9 +719,25 @@ window.initiateDecision = function (decisionType) {
 
   if (acceptanceAssetsGroup) {
     acceptanceAssetsGroup.style.display = decisionType === "approved" ? "block" : "none";
-    const divLabel = document.getElementById("labelDivisionChat");
-    if (divLabel && state.activeApp.division_name) {
-      divLabel.textContent = `${state.activeApp.division_name} Group Chat Link`;
+    const divName = state.activeApp.division_name || "";
+    const divClean = divName.replace(/ (Office|Department)$/i, "");
+    const labelInput = document.getElementById("inputDivisionChatLabel");
+    const linkInput = document.getElementById("inputDivisionChatLink");
+
+    if (labelInput) {
+      if (/data|tech|cloud|developer|software/i.test(divName)) {
+        labelInput.value = "Technology Group Chat";
+        if (linkInput && !linkInput.value.trim()) {
+          linkInput.value = "https://m.me/j/Abb8Zoll7JHw3hNg/";
+        }
+      } else if (/creative|media|design/i.test(divName)) {
+        labelInput.value = "Creatives Group Chat";
+        if (linkInput && !linkInput.value.trim()) {
+          linkInput.value = "https://m.me/j/AbaoQzrJXHAqFy08/";
+        }
+      } else {
+        labelInput.value = `${divClean} Group Chat`;
+      }
     }
   }
 
@@ -854,37 +870,38 @@ window.updateVisualPreview = function () {
   const footerBanner = getActiveFooterBannerUrl();
   const genLink = document.getElementById("inputGeneralChatLink")?.value.trim() || "";
   const divLink = document.getElementById("inputDivisionChatLink")?.value.trim() || "";
+  const divLabelInput = document.getElementById("inputDivisionChatLabel");
   const genQr = state.generalQrBase64 || "";
   const divQr = state.divisionQrBase64 || "";
   const rawDiv = state.activeApp ? state.activeApp.division_name : "Division";
   const divClean = (rawDiv || "Division").replace(/ (Office|Department)$/i, "");
-  const divLabel = `${divClean} Group Chat`;
+  const divLabel = (divLabelInput && divLabelInput.value.trim()) || `${divClean} Group Chat`;
 
   let groupChatsHtml = "";
   if (genLink || divLink || genQr || divQr) {
     let items = "";
     if (genLink || genQr) {
-      items += `<div style="margin: 16px 0 24px 0;">`;
+      items += `<div style="margin: 16px 0 20px 0;">`;
       if (genLink) {
-        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>General Group Chat</em>: <a href="${escapeHtml(genLink)}" style="color: #0073bb; text-decoration: underline;" target="_blank">${escapeHtml(genLink)}</a></p>`;
+        items += `<p style="margin: 0 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; color: #222222; line-height: 1.55;"><span style="color: #0c356a; font-weight: bold; font-style: italic;">General Group Chat:</span> <a href="${escapeHtml(genLink)}" style="color: #0066cc; text-decoration: underline;" target="_blank">${escapeHtml(genLink)}</a></p>`;
       } else {
-        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>General Group Chat</em></p>`;
+        items += `<p style="margin: 0 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; line-height: 1.55;"><span style="color: #0c356a; font-weight: bold; font-style: italic;">General Group Chat:</span></p>`;
       }
       if (genQr) {
-        items += `<img src="${genQr}" alt="General Group Chat QR Code" width="180" style="width: 180px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; background: #ffffff; display: block; margin-top: 8px;" />`;
+        items += `<img src="${genQr}" alt="General Group Chat QR Code" width="170" style="width: 170px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #ffffff; display: block; margin-top: 8px; margin-bottom: 8px;" />`;
       }
       items += `</div>`;
     }
 
     if (divLink || divQr) {
-      items += `<div style="margin: 16px 0 24px 0;">`;
+      items += `<div style="margin: 16px 0 20px 0;">`;
       if (divLink) {
-        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>${escapeHtml(divLabel)}</em>: <a href="${escapeHtml(divLink)}" style="color: #0073bb; text-decoration: underline;" target="_blank">${escapeHtml(divLink)}</a></p>`;
+        items += `<p style="margin: 0 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; color: #222222; line-height: 1.55;"><span style="color: #0c356a; font-weight: bold; font-style: italic;">${escapeHtml(divLabel)}:</span> <a href="${escapeHtml(divLink)}" style="color: #0066cc; text-decoration: underline;" target="_blank">${escapeHtml(divLink)}</a></p>`;
       } else {
-        items += `<p style="margin: 0 0 8px 0; font-size: 15px; color: #2d3748;"><em>${escapeHtml(divLabel)}</em></p>`;
+        items += `<p style="margin: 0 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; line-height: 1.55;"><span style="color: #0c356a; font-weight: bold; font-style: italic;">${escapeHtml(divLabel)}:</span></p>`;
       }
       if (divQr) {
-        items += `<img src="${divQr}" alt="${escapeHtml(divLabel)} QR Code" width="180" style="width: 180px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; background: #ffffff; display: block; margin-top: 8px;" />`;
+        items += `<img src="${divQr}" alt="${escapeHtml(divLabel)} QR Code" width="170" style="width: 170px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #ffffff; display: block; margin-top: 8px; margin-bottom: 8px;" />`;
       }
       items += `</div>`;
     }
@@ -896,12 +913,8 @@ window.updateVisualPreview = function () {
   let chatsInserted = false;
 
   for (const p of paragraphs) {
-    let pFormatted = escapeHtml(p).replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    if (p.trim().toLowerCase().startsWith("congratulations")) {
-      contentBlocks.push(`<p style="margin: 0 0 16px 0; font-size: 16px; font-weight: bold; color: #1a202c; line-height: 1.5;">${pFormatted}</p>`);
-    } else {
-      contentBlocks.push(`<p style="margin: 0 0 16px 0; font-size: 15px; color: #2d3748; line-height: 1.6;">${pFormatted.replace(/\n/g, "<br />")}</p>`);
-    }
+    let pFormatted = escapeHtml(p).replace(/\*([^*]+)\*/g, '<span style="color: #0c356a; font-weight: bold; font-style: italic;">$1</span>');
+    contentBlocks.push(`<p style="margin: 0 0 16px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; color: #222222; line-height: 1.55;">${pFormatted.replace(/\n/g, "<br />")}</p>`);
 
     if (p.toLowerCase().includes("group chats below") && groupChatsHtml && !chatsInserted) {
       contentBlocks.push(groupChatsHtml);
@@ -945,14 +958,14 @@ window.updateVisualPreview = function () {
   <meta charset="utf-8">
   <title>${escapeHtml(subject)}</title>
 </head>
-<body style="margin: 0; padding: 20px 0; background-color: #f7fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+<body style="margin: 0; padding: 20px 0; background-color: #f7fafc; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased;">
   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f7fafc;">
     <tr>
       <td align="center" style="padding: 10px;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
           ${headerImgHtml}
           <tr>
-            <td style="padding: 32px 30px 24px 30px; color: #2d3748; font-size: 15px; line-height: 1.6;">
+            <td style="padding: 28px 30px 24px 30px; color: #222222; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; line-height: 1.55;">
               ${bodyContentHtml}
             </td>
           </tr>
@@ -960,7 +973,7 @@ window.updateVisualPreview = function () {
         </table>
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; margin-top: 16px;">
           <tr>
-            <td align="center" style="font-size: 12px; color: #a0aec0; padding: 10px 20px; line-height: 1.4;">
+            <td align="center" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #a0aec0; padding: 10px 20px; line-height: 1.4;">
               AWS Student Builder Group &bull; Jose Rizal University Chapter<br>
               <span style="font-size: 11px;">This is an official administrative communication from AWS SBG JRU.</span>
             </td>
@@ -978,11 +991,19 @@ window.updateVisualPreview = function () {
   }
 };
 
-function fetchEmailPreview(templateId) {
+function fetchEmailPreview(decisionType) {
+  if (!state.activeApp) return;
+
   const nextSteps = document.getElementById("inputNextSteps")?.value.trim() || undefined;
   const revNotes = document.getElementById("inputRevisionNotes")?.value.trim() || undefined;
   const revDeadline = document.getElementById("inputRevisionDeadline")?.value.trim() || undefined;
   const declineReason = document.getElementById("inputDeclineReason")?.value.trim() || undefined;
+  const templateId = decisionType === "pending" ? "approved" : decisionType;
+  const headerBanner = getActiveHeaderBannerUrl();
+  const footerBanner = getActiveFooterBannerUrl();
+  const genLink = document.getElementById("inputGeneralChatLink")?.value.trim() || undefined;
+  const divLink = document.getElementById("inputDivisionChatLink")?.value.trim() || undefined;
+  const divLabel = document.getElementById("inputDivisionChatLabel")?.value.trim() || undefined;
 
   fetch(`${API_BASE}/api/v1/admin/applications/${state.activeApp.id}/email/preview`, {
     method: "POST",
@@ -993,6 +1014,13 @@ function fetchEmailPreview(templateId) {
       revision_notes: revNotes,
       revision_deadline: revDeadline,
       decline_reason: declineReason,
+      header_banner_url: headerBanner,
+      footer_banner_url: footerBanner,
+      general_chat_link: genLink,
+      division_chat_link: divLink,
+      division_chat_label: divLabel,
+      general_qr_base64: state.generalQrBase64 || undefined,
+      division_qr_base64: state.divisionQrBase64 || undefined,
     }),
   })
     .then((res) => res.json())
@@ -1039,6 +1067,7 @@ window.confirmAndDispatch = function () {
   const footerBanner = getActiveFooterBannerUrl();
   const genLink = document.getElementById("inputGeneralChatLink")?.value.trim();
   const divLink = document.getElementById("inputDivisionChatLink")?.value.trim();
+  const divLabel = document.getElementById("inputDivisionChatLabel")?.value.trim();
 
   const payload = {
     decision: state.pendingDecision,
@@ -1055,6 +1084,7 @@ window.confirmAndDispatch = function () {
     general_chat_link: genLink,
     general_qr_base64: state.generalQrBase64 || undefined,
     division_chat_link: divLink,
+    division_chat_label: divLabel || undefined,
     division_qr_base64: state.divisionQrBase64 || undefined,
   };
 

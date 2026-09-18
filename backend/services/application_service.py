@@ -274,6 +274,7 @@ def record_decision(
     general_chat_link: Optional[str] = None,
     general_qr_base64: Optional[str] = None,
     division_chat_link: Optional[str] = None,
+    division_chat_label: Optional[str] = None,
     division_qr_base64: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
@@ -345,6 +346,7 @@ def record_decision(
                 general_qr_base64=general_qr_base64,
                 division_chat_link=division_chat_link,
                 division_qr_base64=division_qr_base64,
+                division_chat_label=division_chat_label,
             )
 
         html_body = build_html_email(
@@ -357,6 +359,7 @@ def record_decision(
             division_chat_link=division_chat_link,
             division_qr_base64=division_qr_base64,
             division_name=app.get("division_name"),
+            division_chat_label=division_chat_label,
         )
 
         email_result = send_email(

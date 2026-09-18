@@ -223,6 +223,7 @@ async def submit_decision(
         general_chat_link=payload.general_chat_link,
         general_qr_base64=payload.general_qr_base64,
         division_chat_link=payload.division_chat_link,
+        division_chat_label=payload.division_chat_label,
         division_qr_base64=payload.division_qr_base64,
     )
     return res
@@ -248,6 +249,7 @@ async def preview_application_email(
         general_chat_link=payload.general_chat_link,
         general_qr_base64=payload.general_qr_base64,
         division_chat_link=payload.division_chat_link,
+        division_chat_label=payload.division_chat_label,
         division_qr_base64=payload.division_qr_base64,
     )
     return EmailPreviewResponse(
