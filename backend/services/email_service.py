@@ -1,4 +1,6 @@
+import os
 import re
+import base64
 import smtplib
 import datetime
 from email.message import EmailMessage
@@ -386,6 +388,87 @@ def preview_email(
     return subject, body, vars_map, html_preview
 
 
+def _package_email_message(
+    subject: str,
+    text_body: str,
+    html_body: Optional[str],
+    recipient_email: str,
+) -> EmailMessage:
+    """
+    Packages plain text and HTML into a standard multipart/alternative and multipart/related MIME message.
+    Automatically converts local asset URLs and base64 QR data URIs into inline CID attachments (cid:...).
+    Ensures Gmail, Outlook, and Apple Mail render graphics without external proxy fetch errors or data URI stripping.
+    """
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = f"AWS Student Builder Group JRU Chapter <{EMAIL_USER}>"
+    msg["To"] = recipient_email
+    msg.set_content(text_body)
+
+    if not html_body:
+        return msg
+
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "assets"))
+    inline_attachments = []
+
+    def _replace_local_asset(match):
+        full_url = match.group(1)
+        clean = re.sub(r"^https?://[^/]+/", "/", full_url)
+        clean = re.sub(r"^/?assets/", "", clean).lstrip("/")
+        import urllib.parse
+        clean = urllib.parse.unquote(clean)
+        file_path = os.path.join(base_dir, clean)
+
+        if os.path.exists(file_path):
+            cid = f"banner_{len(inline_attachments)}"
+            try:
+                with open(file_path, "rb") as f:
+                    data = f.read()
+                ext = os.path.splitext(file_path)[1].lstrip(".").lower()
+                subtype = "png" if ext == "png" else ("jpeg" if ext in ("jpg", "jpeg") else "png")
+                inline_attachments.append((data, "image", subtype, cid, os.path.basename(file_path)))
+                return f'src="cid:{cid}"'
+            except Exception as e:
+                print(f"Notice: Failed reading local asset {file_path}: {e}")
+        return match.group(0)
+
+    def _replace_data_uri(match):
+        mime_type = match.group(1)
+        b64_data = match.group(2)
+        try:
+            raw_bytes = base64.b64decode(b64_data)
+            cid = f"qr_{len(inline_attachments)}"
+            subtype = mime_type.split("/")[-1].lower() if "/" in mime_type else "png"
+            if subtype == "jpg":
+                subtype = "jpeg"
+            inline_attachments.append((raw_bytes, "image", subtype, cid, f"{cid}.{subtype}"))
+            return f'src="cid:{cid}"'
+        except Exception as e:
+            print(f"Notice: Failed decoding base64 data URI: {e}")
+            return match.group(0)
+
+    # Convert local banners and base64 QR codes to cid: references
+    processed_html = re.sub(
+        r'src=["\']((?:https?://(?:localhost|127\.0\.0\.1)(?::\d+)?/|/)?assets/[^"\']+)["\']',
+        _replace_local_asset,
+        html_body,
+    )
+    processed_html = re.sub(
+        r'src=["\']data:([^;]+);base64,([a-zA-Z0-9+/=]+)["\']',
+        _replace_data_uri,
+        processed_html,
+    )
+
+    msg.add_alternative(processed_html, subtype="html")
+
+    # Add inline attachments to the HTML alternative part
+    html_part = msg.get_payload()[1]
+    for data, maintype, subtype, cid, filename in inline_attachments:
+        html_part.add_related(data, maintype, subtype, cid=f"<{cid}>", filename=filename, disposition="inline")
+
+    return msg
+
+
 def send_email(
     recipient_email: str,
     subject: str,
@@ -397,7 +480,7 @@ def send_email(
     sender_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Sends email via SMTP using MIME multipart (plain-text + HTML).
+    Sends email via SMTP using MIME multipart (plain-text + HTML + inline CID images).
     Falls back to dry_run logging if SMTP credentials are missing.
     Records delivery status in `email_logs` table.
     """
@@ -410,20 +493,13 @@ def send_email(
         print(f"[EMAIL DRY RUN] To: {recipient_email}\nSubject: {subject}\n\n{body}\n")
     else:
         try:
-            msg = EmailMessage()
-            msg["Subject"] = subject
-            msg["From"] = f"AWS Student Builder Group JRU Chapter <{EMAIL_USER}>"
-            msg["To"] = recipient_email
-            msg.set_content(body)  # Plain-text alternative
+            msg = _package_email_message(subject, body, html_body, recipient_email)
 
-            if html_body:
-                msg.add_alternative(html_body, subtype="html")
-
-            with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
+            with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=15) as smtp:
                 smtp.starttls()
                 smtp.login(EMAIL_USER, EMAIL_PASS)
                 smtp.send_message(msg)
-            print(f"[EMAIL SENT] Successfully sent email to {recipient_email}")
+            print(f"[EMAIL SENT] Successfully sent email with inline graphics to {recipient_email}")
         except Exception as e:
             delivery_status = "failed"
             error_message = str(e)
