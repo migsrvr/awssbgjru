@@ -82,7 +82,7 @@ class RewriteHandler(http.server.SimpleHTTPRequestHandler):
     def _proxy_api(self):
         backend_url = f"http://localhost:{BACKEND_PORT}{self.path}"
         body = None
-        if self.command == "POST":
+        if self.command in ("POST", "PUT", "PATCH"):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length > 0 else None
 
@@ -103,6 +103,9 @@ class RewriteHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(resp.read())
         except urllib.error.HTTPError as e:
             self.send_response(e.code)
+            for k, v in e.headers.items():
+                if k.lower() not in ("transfer-encoding", "content-encoding"):
+                    self.send_header(k, v)
             self.end_headers()
             self.wfile.write(e.read())
         except urllib.error.URLError:
@@ -110,6 +113,7 @@ class RewriteHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"error": "Backend not running"}).encode())
+
 
 
 if __name__ == "__main__":

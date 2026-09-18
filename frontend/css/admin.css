@@ -970,3 +970,14 @@ body.admin-body {
     display: none;
   }
 }
+
+/* Pre-auth flicker prevention on reload */
+html.admin-authenticated #loginScreen {
+  display: none !important;
+}
+html.admin-authenticated #adminNavbar {
+  display: flex !important;
+}
+html.admin-authenticated #adminMainContent {
+  display: block !important;
+}

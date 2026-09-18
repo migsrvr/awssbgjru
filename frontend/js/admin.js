@@ -7,11 +7,18 @@ const API_BASE = (window.location.hostname === "localhost" || window.location.ho
   ? `http://${window.location.hostname}:${window.location.port || "8000"}`
   : "";
 
+let cachedUser = null;
+try {
+  const u = localStorage.getItem("admin_user");
+  if (u) cachedUser = JSON.parse(u);
+} catch (_) {}
+
 const state = {
   token: localStorage.getItem("admin_token") || "",
-  user: null,
+  user: cachedUser,
   currentView: "dashboard",
   applications: [],
+  recentApplications: [],
   total: 0,
   page: 1,
   pageSize: 15,
@@ -67,26 +74,47 @@ function showToast(message, type = "info") {
   }, 4000);
 }
 
-// ---------------- Authentication ----------------
+// ---------------- Authentication & Session ----------------
 function checkAuth() {
   if (!state.token) {
     showLoginScreen();
     return;
   }
 
+  // Instantly activate workspace without waiting for server response
+  hideLoginScreen();
+  if (state.user) {
+    renderUserHeader();
+  }
+
+  // Restore view from URL hash or previous session
+  const validViews = ["dashboard", "queue", "templates", "settings", "audit"];
+  const hash = window.location.hash.replace("#", "").trim();
+  const savedView = localStorage.getItem("admin_active_view");
+  const initialView = validViews.includes(hash) ? hash : (validViews.includes(savedView) ? savedView : "dashboard");
+  switchView(initialView);
+
+  // Background verification of token with /me (non-blocking)
   fetch(`${API_BASE}/api/v1/admin/me`, { headers: getHeaders() })
     .then((res) => {
-      if (!res.ok) throw new Error("Unauthorized");
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("UNAUTHORIZED");
+      }
+      if (!res.ok) throw new Error("SERVER_ERROR");
       return res.json();
     })
     .then((userData) => {
       state.user = userData;
+      localStorage.setItem("admin_user", JSON.stringify(userData));
       renderUserHeader();
-      hideLoginScreen();
-      loadDashboard();
     })
-    .catch(() => {
-      logout();
+    .catch((err) => {
+      // Only logout if token is confirmed invalid or expired
+      if (err.message === "UNAUTHORIZED") {
+        logout();
+      } else {
+        console.warn("Notice: /me session validation completed with non-fatal status:", err);
+      }
     });
 }
 
@@ -120,7 +148,15 @@ function initLogin() {
   if (devBypassBtn) {
     devBypassBtn.addEventListener("click", () => {
       state.token = "dev-admin-token";
+      state.user = {
+        id: "dev-officer-001",
+        email: "dev.officer@awssbgjru.local",
+        full_name: "Dev Officer (Administrator)",
+        role: "administrator",
+      };
       localStorage.setItem("admin_token", state.token);
+      localStorage.setItem("admin_user", JSON.stringify(state.user));
+      document.documentElement.classList.add("admin-authenticated");
       checkAuth();
       showToast("Signed in as Local Dev Administrator", "success");
     });
@@ -147,23 +183,30 @@ async function loginWithCredentials(email, password) {
   state.token = data.access_token;
   state.user = data.user;
   localStorage.setItem("admin_token", state.token);
+  localStorage.setItem("admin_user", JSON.stringify(state.user));
+  document.documentElement.classList.add("admin-authenticated");
 }
 
 function logout() {
   state.token = "";
   state.user = null;
   localStorage.removeItem("admin_token");
+  localStorage.removeItem("admin_user");
+  localStorage.removeItem("admin_active_view");
+  document.documentElement.classList.remove("admin-authenticated");
   showLoginScreen();
   showToast("Logged out successfully", "info");
 }
 
 function showLoginScreen() {
+  document.documentElement.classList.remove("admin-authenticated");
   document.getElementById("loginScreen").style.display = "flex";
   document.getElementById("adminMainContent").style.display = "none";
   document.getElementById("adminNavbar").style.display = "none";
 }
 
 function hideLoginScreen() {
+  document.documentElement.classList.add("admin-authenticated");
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("adminMainContent").style.display = "block";
   document.getElementById("adminNavbar").style.display = "flex";
@@ -196,6 +239,9 @@ function initNav() {
 
 function switchView(viewName) {
   state.currentView = viewName;
+  localStorage.setItem("admin_active_view", viewName);
+  window.location.hash = viewName;
+
   document.querySelectorAll(".admin-nav-tab").forEach((t) => {
     t.classList.toggle("active", t.dataset.view === viewName);
   });
@@ -215,27 +261,47 @@ function switchView(viewName) {
 // ---------------- Dashboard ----------------
 function loadDashboard() {
   fetch(`${API_BASE}/api/v1/admin/metrics`, { headers: getHeaders() })
-    .then((res) => res.json())
-    .then((data) => {
-      document.getElementById("metricTotal").textContent = data.total_applications || 0;
-      document.getElementById("metricTurnaround").textContent = `${data.median_turnaround_hours || 0} hrs`;
-
-      const breakdown = data.status_breakdown || {};
-      document.getElementById("metricNew").textContent = breakdown.new || 0;
-      document.getElementById("metricUnderReview").textContent = breakdown.under_review || 0;
-      document.getElementById("metricApproved").textContent = breakdown.approved || 0;
-      document.getElementById("metricRevision").textContent = breakdown.revision_requested || 0;
-      document.getElementById("metricDeclined").textContent = breakdown.declined || 0;
+    .then((res) => {
+      if (!res.ok) throw new Error("Metrics response not ok");
+      return res.json();
     })
-    .catch((err) => console.error("Metrics load failed:", err));
+    .then((data) => {
+      updateKpiElements(data);
+    })
+    .catch((err) => console.warn("Metrics load notice:", err));
 
   // Quick queue list in dashboard
   fetch(`${API_BASE}/api/v1/admin/applications?page_size=5&status=new`, { headers: getHeaders() })
-    .then((res) => res.json())
-    .then((data) => {
-      renderRecentQueue(data.applications || []);
+    .then((res) => {
+      if (!res.ok) throw new Error("Recent queue response not ok");
+      return res.json();
     })
-    .catch((err) => console.error("Recent queue load failed:", err));
+    .then((data) => {
+      state.recentApplications = data.applications || [];
+      renderRecentQueue(state.recentApplications);
+    })
+    .catch((err) => console.warn("Recent queue load notice:", err));
+}
+
+function updateKpiElements(data) {
+  if (!data) return;
+  const totalEl = document.getElementById("metricTotal");
+  const turnaroundEl = document.getElementById("metricTurnaround");
+  if (totalEl) totalEl.textContent = data.total_applications || 0;
+  if (turnaroundEl) turnaroundEl.textContent = `${data.median_turnaround_hours || 0} hrs`;
+
+  const breakdown = data.status_breakdown || {};
+  const map = {
+    metricNew: breakdown.new || 0,
+    metricUnderReview: breakdown.under_review || 0,
+    metricApproved: breakdown.approved || 0,
+    metricRevision: breakdown.revision_requested || 0,
+    metricDeclined: breakdown.declined || 0,
+  };
+  for (const [id, val] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
 }
 
 function renderRecentQueue(apps) {
@@ -440,7 +506,6 @@ window.openReviewModal = function (appId) {
 function closeReviewModal() {
   document.getElementById("reviewModalOverlay").classList.remove("active");
   state.activeApp = null;
-  loadQueue();
 }
 
 function renderReviewModal(app) {
@@ -492,7 +557,24 @@ function renderClaimButton(app) {
 
 function claimCurrentApp() {
   if (!state.activeApp) return;
-  fetch(`${API_BASE}/api/v1/admin/applications/${state.activeApp.id}/claim`, {
+  const appId = state.activeApp.id;
+  const myId = state.user ? state.user.id : "officer";
+  const myName = state.user ? state.user.full_name : "You";
+
+  // Instant optimistic update
+  state.activeApp.assigned_reviewer_id = myId;
+  state.activeApp.assigned_reviewer_name = myName;
+  renderClaimButton(state.activeApp);
+
+  const rowApp = state.applications.find((a) => a.id === appId);
+  if (rowApp) {
+    rowApp.assigned_reviewer_id = myId;
+    rowApp.assigned_reviewer_name = myName;
+    renderQueueTable();
+  }
+  showToast("Application claimed!", "success");
+
+  fetch(`${API_BASE}/api/v1/admin/applications/${appId}/claim`, {
     method: "POST",
     headers: getHeaders(),
   })
@@ -500,25 +582,38 @@ function claimCurrentApp() {
       if (!res.ok) throw new Error("Could not claim application");
       return res.json();
     })
-    .then(() => {
-      showToast("Application claimed!", "success");
-      openReviewModal(state.activeApp.id);
-    })
-    .catch((err) => showToast(err.message, "error"));
+    .catch((err) => {
+      showToast(err.message, "error");
+      openReviewModal(appId);
+    });
 }
 
 function releaseCurrentApp() {
   if (!state.activeApp) return;
-  fetch(`${API_BASE}/api/v1/admin/applications/${state.activeApp.id}/release`, {
+  const appId = state.activeApp.id;
+
+  // Instant optimistic update
+  state.activeApp.assigned_reviewer_id = null;
+  state.activeApp.assigned_reviewer_name = null;
+  renderClaimButton(state.activeApp);
+
+  const rowApp = state.applications.find((a) => a.id === appId);
+  if (rowApp) {
+    rowApp.assigned_reviewer_id = null;
+    rowApp.assigned_reviewer_name = null;
+    renderQueueTable();
+  }
+  showToast("Application released back to queue", "info");
+
+  fetch(`${API_BASE}/api/v1/admin/applications/${appId}/release`, {
     method: "POST",
     headers: getHeaders(),
   })
     .then((res) => res.json())
-    .then(() => {
-      showToast("Application released back to queue", "info");
-      openReviewModal(state.activeApp.id);
-    })
-    .catch((err) => showToast(err.message, "error"));
+    .catch((err) => {
+      showToast(err.message, "error");
+      openReviewModal(appId);
+    });
 }
 
 function loadAndRenderRubric() {
@@ -573,19 +668,24 @@ function renderNotesThread(reviews) {
 window.submitQuickNote = function () {
   const input = document.getElementById("inputQuickNote");
   if (!input || !input.value.trim() || !state.activeApp) return;
+  const noteText = input.value.trim();
+  input.value = "";
+
+  const myName = state.user ? state.user.full_name : "You";
+  if (!state.activeApp.reviews) state.activeApp.reviews = [];
+  state.activeApp.reviews.push({
+    reviewer_name: myName,
+    created_at: new Date().toISOString(),
+    internal_notes: noteText,
+  });
+  renderNotesThread(state.activeApp.reviews);
+  showToast("Note added", "success");
 
   fetch(`${API_BASE}/api/v1/admin/applications/${state.activeApp.id}/notes`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify({ notes: input.value.trim() }),
-  })
-    .then((res) => res.json())
-    .then(() => {
-      input.value = "";
-      showToast("Note added", "success");
-      openReviewModal(state.activeApp.id);
-    })
-    .catch((err) => showToast(err.message || "Failed to add note", "error"));
+    body: JSON.stringify({ notes: noteText }),
+  }).catch((err) => showToast(err.message || "Failed to add note", "error"));
 };
 
 // ---------------- Decision Flow & Email Preview ----------------
@@ -697,37 +797,148 @@ window.confirmAndDispatch = function () {
   submitDecisionPayload(payload);
 };
 
-function submitDecisionPayload(payload) {
-  const btn = document.getElementById("btnConfirmSend");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Processing...";
+// ---------------- Instant Optimistic CRUD Decision ----------------
+function applyOptimisticDecision(appId, decision, payload) {
+  const targetDecision = decision;
+  const newStatus = targetDecision === "pending" ? "under_review" : targetDecision;
+  const officerName = state.user ? state.user.full_name : "Officer";
+  const nowIso = new Date().toISOString();
+
+  let oldStatus = "new";
+  if (state.activeApp && state.activeApp.id === appId) {
+    oldStatus = state.activeApp.application_status || "new";
+    state.activeApp.application_status = newStatus;
+    state.activeApp.reviewed_by = officerName;
+    state.activeApp.reviewed_at = nowIso;
+    state.activeApp.decision_reason_code = payload.reason_code || payload.decline_reason || null;
   }
 
-  fetch(`${API_BASE}/api/v1/admin/applications/${state.activeApp.id}/decision`, {
+  // 1. Instantly update state.applications in memory
+  const appInList = state.applications.find((a) => a.id === appId);
+  if (appInList) {
+    oldStatus = appInList.application_status || oldStatus;
+    appInList.application_status = newStatus;
+    appInList.reviewed_by = officerName;
+    appInList.reviewed_at = nowIso;
+    appInList.decision_reason_code = payload.reason_code || payload.decline_reason || null;
+  }
+
+  // 2. Instantly update Queue Table
+  renderQueueTable();
+
+  // 3. Instantly update Status Pill counters
+  if (state.statusCounts) {
+    if (oldStatus in state.statusCounts) {
+      state.statusCounts[oldStatus] = Math.max(0, (state.statusCounts[oldStatus] || 0) - 1);
+    }
+    state.statusCounts[newStatus] = (state.statusCounts[newStatus] || 0) + 1;
+    updateStatusCounters();
+  }
+
+  // 4. Instantly update Dashboard recent applications
+  if (state.recentApplications && state.recentApplications.length > 0) {
+    const rIdx = state.recentApplications.findIndex((a) => a.id === appId);
+    if (rIdx !== -1) {
+      if (newStatus !== "new") {
+        state.recentApplications.splice(rIdx, 1);
+      } else {
+        state.recentApplications[rIdx].application_status = newStatus;
+      }
+      renderRecentQueue(state.recentApplications);
+    }
+  }
+
+  // 5. Instantly update Dashboard KPI metrics counters
+  const statusToMetricId = {
+    new: "metricNew",
+    under_review: "metricUnderReview",
+    approved: "metricApproved",
+    revision_requested: "metricRevision",
+    declined: "metricDeclined",
+  };
+
+  const oldElId = statusToMetricId[oldStatus];
+  const newElId = statusToMetricId[newStatus];
+
+  if (oldElId) {
+    const el = document.getElementById(oldElId);
+    if (el) el.textContent = Math.max(0, parseInt(el.textContent || "0", 10) - 1);
+  }
+  if (newElId) {
+    const el = document.getElementById(newElId);
+    if (el) el.textContent = parseInt(el.textContent || "0", 10) + 1;
+  }
+}
+
+function submitDecisionPayload(payload) {
+  if (!state.activeApp) return;
+  const appId = state.activeApp.id;
+  const decisionType = payload.decision;
+
+  // 1. INSTANT CLOSE MODALS & INSTANT UI UPDATE (0ms delay!)
+  closeEmailModal();
+  document.getElementById("reviewModalOverlay").classList.remove("active");
+  state.pendingDecision = null;
+
+  // Optimistically update memory and DOM
+  applyOptimisticDecision(appId, decisionType, payload);
+
+  const formattedDecision = decisionType.replace("_", " ").toUpperCase();
+  showToast(`Application #${appId} marked as ${formattedDecision}!`, "success");
+
+  // 2. DISPATCH TO BACKEND IN BACKGROUND
+  fetch(`${API_BASE}/api/v1/admin/applications/${appId}/decision`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(payload),
   })
     .then((res) => {
-      if (!res.ok) throw new Error("Failed to record decision");
+      if (!res.ok) throw new Error("Failed to record decision on server");
       return res.json();
     })
-    .then(() => {
-      showToast(`Decision '${payload.decision}' successfully applied!`, "success");
-      closeEmailModal();
-      closeReviewModal();
-      loadQueue();
+    .then((data) => {
+      if (payload.send_email) {
+        if (data.email_result && data.email_result.delivery_status === "sent") {
+          showToast("Email dispatched successfully to applicant.", "info");
+        }
+      }
+      // Silently sync server state in background
+      silentSync();
     })
     .catch((err) => {
-      showToast(err.message, "error");
-    })
-    .finally(() => {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = "Confirm & Send Email";
-      }
+      showToast(`Error saving decision: ${err.message}`, "error");
+      // Revert / re-fetch on failure
+      loadQueue();
+      loadDashboard();
     });
+}
+
+function silentSync() {
+  if (state.currentView === "queue") {
+    const params = new URLSearchParams({
+      page: state.page,
+      page_size: state.pageSize,
+    });
+    if (state.filters.status && state.filters.status !== "all") params.append("status", state.filters.status);
+    if (state.filters.search) params.append("search", state.filters.search);
+    if (state.filters.year) params.append("year", state.filters.year);
+    if (state.filters.program) params.append("program", state.filters.program);
+    if (state.filters.division_type) params.append("division_type", state.filters.division_type);
+
+    fetch(`${API_BASE}/api/v1/admin/applications?${params.toString()}`, { headers: getHeaders() })
+      .then((res) => res.json())
+      .then((data) => {
+        state.applications = data.applications || [];
+        state.total = data.total || 0;
+        state.statusCounts = data.status_counts || {};
+        updateStatusCounters();
+        renderQueueTable();
+        updatePaginationControls();
+      })
+      .catch(() => {});
+  } else if (state.currentView === "dashboard") {
+    loadDashboard();
+  }
 }
 
 // ---------------- Email Templates Editor ----------------

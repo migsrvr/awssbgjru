@@ -27,8 +27,17 @@ async def get_current_user(
     if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "").strip()
 
-    # Development fallback if Supabase Auth is not set up
+    # Development fallback if Supabase Auth is not set up or dev tokens are used
     is_dev = not SUPABASE_URL or "localhost" in os.getenv("APP_BASE_URL", "")
+    if is_dev and token in ("dev-token", "dev-admin-token"):
+        dev_role = "administrator" if token == "dev-admin-token" else "reviewer"
+        return OfficerUser(
+            id="dev-officer-001",
+            email="dev.officer@awssbgjru.local",
+            full_name=f"Dev Officer ({dev_role.title()})",
+            role=dev_role,
+        )
+
     if not token:
         if is_dev and x_dev_officer:
             role = "administrator" if x_dev_officer == "administrator" else "reviewer"

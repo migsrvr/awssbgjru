@@ -14,6 +14,12 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../css/admin.css" />
+    <script>
+      // Immediately mark as authenticated if token exists to prevent login flash on refresh
+      if (localStorage.getItem("admin_token")) {
+        document.documentElement.classList.add("admin-authenticated");
+      }
+    </script>
   </head>
   <body class="admin-body">
     <!-- Top Navbar -->
