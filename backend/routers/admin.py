@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from backend.auth import OfficerUser, require_reviewer, require_admin
-from backend.database import get_supabase_admin
+from backend.database import get_supabase_admin, get_supabase_auth_client
 from backend.schemas.admin import (
     LoginRequest,
     LoginResponse,
@@ -46,36 +46,42 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 @router.post("/auth/login", response_model=LoginResponse)
 async def login_endpoint(payload: LoginRequest):
     """Authenticates an officer via Supabase Auth and validates their role in admin_users."""
-    client = get_supabase_admin()
+    auth_client = get_supabase_auth_client()
+    admin_client = get_supabase_admin()
+
+    raw_login = payload.email.strip()
+    login_email = raw_login if "@" in raw_login else f"{raw_login.lower()}@awssbgjru.me"
+
     try:
-        auth_res = client.auth.sign_in_with_password({
-            "email": payload.email.strip(),
+        auth_res = auth_client.auth.sign_in_with_password({
+            "email": login_email,
             "password": payload.password,
         })
         if not auth_res.session or not auth_res.user:
-            raise HTTPException(status_code=401, detail="Invalid email or password.")
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         user = auth_res.user
         token = auth_res.session.access_token
 
         admin_res = (
-            client.table("admin_users")
+            admin_client.table("admin_users")
             .select("*")
-            .or_(f"id.eq.{user.id},email.eq.{payload.email.strip()}")
+            .or_(f"id.eq.{user.id},email.eq.{login_email}")
             .execute()
         )
 
         if not admin_res.data or len(admin_res.data) == 0:
-            count_res = client.table("admin_users").select("id", count="exact").limit(1).execute()
+            count_res = admin_client.table("admin_users").select("id", count="exact").limit(1).execute()
             if hasattr(count_res, "count") and count_res.count == 0:
                 full_name = (user.user_metadata or {}).get("full_name") or user.email.split("@")[0]
-                client.table("admin_users").insert({
+                admin_client.table("admin_users").insert({
                     "id": str(user.id),
                     "email": user.email,
                     "full_name": full_name,
                     "role": "administrator",
                 }).execute()
                 role = "administrator"
+                officer_full_name = full_name
             else:
                 raise HTTPException(
                     status_code=403,
@@ -84,15 +90,15 @@ async def login_endpoint(payload: LoginRequest):
         else:
             officer_row = admin_res.data[0]
             role = officer_row.get("role", "reviewer")
-            full_name = officer_row.get("full_name", "Officer")
+            officer_full_name = officer_row.get("full_name", "Officer")
 
         return LoginResponse(
             access_token=token,
             token_type="bearer",
             user=OfficerResponse(
                 id=str(user.id),
-                email=user.email or payload.email.strip(),
-                full_name=full_name,
+                email=user.email or login_email,
+                full_name=officer_full_name,
                 role=role,
             ),
         )
@@ -100,6 +106,7 @@ async def login_endpoint(payload: LoginRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+
 
 
 @router.get("/me", response_model=OfficerResponse)

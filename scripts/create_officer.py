@@ -56,7 +56,7 @@ def create_or_update_officer(email: str, password: str, name: str, role: str):
         })
         if auth_res and hasattr(auth_res, "user") and auth_res.user:
             user_id = str(auth_res.user.id)
-            print(f"✓ Created auth user in Supabase Auth (UID: {user_id})")
+            print(f"[OK] Created auth user in Supabase Auth (UID: {user_id})")
     except Exception as e:
         err_str = str(e)
         # If user already exists in auth.users, update password
@@ -74,7 +74,7 @@ def create_or_update_officer(email: str, password: str, name: str, role: str):
                         "password": password,
                         "user_metadata": {"full_name": name},
                     })
-                    print(f"✓ Updated existing Auth user password and metadata (UID: {user_id})")
+                    print(f"[OK] Updated existing Auth user password and metadata (UID: {user_id})")
             except Exception as lookup_err:
                 print(f"Warning: Could not update Auth user directly: {lookup_err}")
         else:
@@ -99,13 +99,13 @@ def create_or_update_officer(email: str, password: str, name: str, role: str):
 
     try:
         client.table("admin_users").upsert(row).execute()
-        print(f"✓ Registered in 'admin_users' table with role '{role}'")
+        print(f"[OK] Registered in 'admin_users' table with role '{role}'")
     except Exception as e:
         print(f"Error inserting into admin_users table: {e}")
         sys.exit(1)
 
     print("\n" + "=" * 60)
-    print("🎉 OFFICER ACCOUNT READY!")
+    print("SUCCESS: OFFICER ACCOUNT READY!")
     print(f"   Email:    {email}")
     print(f"   Name:     {name}")
     print(f"   Role:     {role.upper()}")

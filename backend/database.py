@@ -21,11 +21,19 @@ if SUPABASE_URL and admin_key:
 
 
 def get_supabase_admin() -> Client:
-    """Returns the privileged admin client, falling back to standard client."""
-    client = supabase_admin or supabase
-    if client is None:
+    """Returns the privileged admin client initialized with the service-role key."""
+    admin_key = SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY
+    if not SUPABASE_URL or not admin_key:
         raise RuntimeError(
             "Supabase client not initialized. Ensure SUPABASE_URL and SUPABASE_KEY or SUPABASE_SERVICE_ROLE_KEY are set."
         )
-    return client
+    return create_client(SUPABASE_URL, admin_key)
+
+
+def get_supabase_auth_client() -> Client:
+    """Returns a client for standard user authentication operations."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase client not initialized.")
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
