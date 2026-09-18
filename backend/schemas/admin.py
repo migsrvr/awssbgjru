@@ -2,11 +2,23 @@ from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field
 
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
 class OfficerResponse(BaseModel):
     id: str
     email: str
     full_name: str
     role: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: OfficerResponse
+
 
 
 class ApplicationReviewItem(BaseModel):

@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from backend.auth import OfficerUser, require_reviewer, require_admin
 from backend.database import get_supabase_admin
 from backend.schemas.admin import (
+    LoginRequest,
+    LoginResponse,
     OfficerResponse,
     QueueResponse,
     ApplicationDetail,
@@ -41,7 +43,67 @@ from backend.services.audit_service import log_action
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 
+@router.post("/auth/login", response_model=LoginResponse)
+async def login_endpoint(payload: LoginRequest):
+    """Authenticates an officer via Supabase Auth and validates their role in admin_users."""
+    client = get_supabase_admin()
+    try:
+        auth_res = client.auth.sign_in_with_password({
+            "email": payload.email.strip(),
+            "password": payload.password,
+        })
+        if not auth_res.session or not auth_res.user:
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+        user = auth_res.user
+        token = auth_res.session.access_token
+
+        admin_res = (
+            client.table("admin_users")
+            .select("*")
+            .or_(f"id.eq.{user.id},email.eq.{payload.email.strip()}")
+            .execute()
+        )
+
+        if not admin_res.data or len(admin_res.data) == 0:
+            count_res = client.table("admin_users").select("id", count="exact").limit(1).execute()
+            if hasattr(count_res, "count") and count_res.count == 0:
+                full_name = (user.user_metadata or {}).get("full_name") or user.email.split("@")[0]
+                client.table("admin_users").insert({
+                    "id": str(user.id),
+                    "email": user.email,
+                    "full_name": full_name,
+                    "role": "administrator",
+                }).execute()
+                role = "administrator"
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail="This account is not registered as an authorized AWS SBG JRU officer.",
+                )
+        else:
+            officer_row = admin_res.data[0]
+            role = officer_row.get("role", "reviewer")
+            full_name = officer_row.get("full_name", "Officer")
+
+        return LoginResponse(
+            access_token=token,
+            token_type="bearer",
+            user=OfficerResponse(
+                id=str(user.id),
+                email=user.email or payload.email.strip(),
+                full_name=full_name,
+                role=role,
+            ),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+
+
 @router.get("/me", response_model=OfficerResponse)
+
 async def get_me(user: OfficerUser = Depends(require_reviewer)):
     """Returns the authenticated officer's identity and role."""
     return OfficerResponse(

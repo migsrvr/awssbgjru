@@ -128,17 +128,24 @@ function initLogin() {
 }
 
 async function loginWithCredentials(email, password) {
-  // If Supabase JS client is loaded
-  if (window.supabaseClient) {
-    const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    state.token = data.session.access_token;
-    localStorage.setItem("admin_token", state.token);
-    return;
+  const res = await fetch(`${API_BASE}/api/v1/admin/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!res.ok) {
+    let errMsg = "Invalid email or password.";
+    try {
+      const errPayload = await res.json();
+      errMsg = errPayload.detail || errMsg;
+    } catch (_) {}
+    throw new Error(errMsg);
   }
 
-  // Otherwise standard fallback token
-  state.token = "dev-admin-token";
+  const data = await res.json();
+  state.token = data.access_token;
+  state.user = data.user;
   localStorage.setItem("admin_token", state.token);
 }
 
