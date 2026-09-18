@@ -21,6 +21,7 @@ from backend.registration_availability import (
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from backend.routers.admin import router as admin_router
 from backend.routers.revision import router as revision_router
 from backend.services.application_service import get_system_settings
@@ -105,6 +106,7 @@ def _get_supabase():
 
 @app.post("/api/register")
 async def register(request: Request):
+    data = await request.json()
     client_ip = request.client.host if request.client else "unknown"
     if not register_limiter.is_allowed(client_ip):
         return JSONResponse(
