@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from backend.auth import OfficerUser, require_reviewer, require_admin
+from backend.api.config import SUPABASE_SERVICE_ROLE_KEY
 from backend.database import get_supabase_admin, get_supabase_auth_client
 from backend.schemas.admin import (
     LoginRequest,
@@ -46,6 +47,12 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 @router.post("/auth/login", response_model=LoginResponse)
 async def login_endpoint(payload: LoginRequest):
     """Authenticates an officer via Supabase Auth and validates their role in admin_users."""
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="Server misconfigured: SUPABASE_SERVICE_ROLE_KEY is not set. "
+            "Add the service-role key to the server environment variables and redeploy.",
+        )
     auth_client = get_supabase_auth_client()
     admin_client = get_supabase_admin()
 
