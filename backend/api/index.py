@@ -1,3 +1,5 @@
+"""AWS Student Builder Group API - Vercel Serverless Entrypoint."""
+
 import sys
 import json
 import os
