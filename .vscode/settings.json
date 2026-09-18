@@ -4,5 +4,15 @@
     "terminal.integrated.fontFamily": "JetBrains Mono",
     "editor.fontSize": 16,
     "editor.fontLigatures": false,
-    "editor.cursorStyle": "line"
+    "editor.cursorStyle": "line",
+    "python.defaultInterpreterPath": "C:\\Users\\Miggy\\AppData\\Local\\Python\\bin\\python.exe",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/backend"
+    ],
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/backend"
+    ],
+    "pyrefly.pythonPath": "C:\\Users\\Miggy\\AppData\\Local\\Python\\bin\\python.exe"
 }

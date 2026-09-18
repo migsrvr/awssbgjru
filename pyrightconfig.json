@@ -1,0 +1,10 @@
+{
+  "include": [
+    "."
+  ],
+  "extraPaths": [
+    ".",
+    "backend",
+    "C:/Users/Miggy/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
+  ]
+}

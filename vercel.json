@@ -33,7 +33,7 @@
       "dest": "frontend/pages/landing-page.html"
     },
     {
-      "src": "/(landing-page|register|explanation|department|office|skillbuilder|loading|waiting-approval|members|about|events|partners|achievements|contact|event-detail)(?:\\.html)?$",
+      "src": "/(landing-page|register|explanation|department|office|skillbuilder|loading|waiting-approval|members|about|events|partners|achievements|contact|event-detail|admin|revision)(?:\\.html)?$",
       "dest": "frontend/pages/$1.html"
     },
     {

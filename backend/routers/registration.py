@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from backend.database import supabase
+from backend.database import get_supabase_admin
 from backend.schemas.registration import RegistrationRequest
 from backend.api.config import (
     EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, NOTIFY_EMAIL,
@@ -17,6 +17,7 @@ from backend.registration_availability import (
     DivisionAvailabilityError,
     validate_division_availability,
 )
+from backend.services.application_service import get_system_settings
 
 router = APIRouter(prefix="/api", tags=["registration"])
 register_limiter = RateLimiter(requests=5, window=60)
@@ -29,6 +30,14 @@ async def register(request: Request, data: RegistrationRequest):
         return JSONResponse(
             {"error": "Rate limit exceeded. Please wait before submitting again."},
             status_code=429,
+        )
+
+    # Check master registration status
+    settings = get_system_settings()
+    if not settings.get("registration_open", True):
+        return JSONResponse(
+            {"error": settings.get("closed_message", "Registration is currently closed.")},
+            status_code=403,
         )
 
     if data.website:
@@ -83,10 +92,12 @@ async def register(request: Request, data: RegistrationRequest):
         "explanation": data.explanation,
         "division_type": data.division_type,
         "division_name": data.division_name,
+        "application_status": "new",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    result = supabase.table("registrations").insert(row).execute()
+    client = get_supabase_admin()
+    result = client.table("registrations").insert(row).execute()
 
     if not result.data:
         raise HTTPException(status_code=500, detail="Failed to insert registration")

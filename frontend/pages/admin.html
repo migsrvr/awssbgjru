@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Protected Officer Admin Review Console for AWS Student Builder Group JRU." />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Admin Review Console — AWS SBG JRU</title>
+    <link rel="icon" type="image/png" href="../assets/shared/components/AWS-NewLogo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Lexend:wght@400;500;600&family=Montserrat:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../css/admin.css" />
+  </head>
+  <body class="admin-body">
+    <!-- Top Navbar -->
+    <header class="admin-navbar" id="adminNavbar" style="display: none;">
+      <a href="/" class="nav-brand">
+        <img src="../assets/shared/components/AWS-NewLogo.webp" alt="AWS Logo" class="brand-logo" />
+        <div class="brand-title-wrap">
+          <span class="brand-title">AWS SBG JRU</span>
+          <span class="brand-badge">Officer Review Console</span>
+        </div>
+      </a>
+
+      <nav>
+        <ul class="admin-nav-links">
+          <li><button class="admin-nav-tab active" data-view="dashboard">📊 <span>Dashboard</span></button></li>
+          <li><button class="admin-nav-tab" data-view="queue">📥 <span>Queue</span></button></li>
+          <li><button class="admin-nav-tab" data-view="templates">✉️ <span>Email Templates</span></button></li>
+          <li class="admin-only"><button class="admin-nav-tab" data-view="settings">⚙️ <span>Settings</span></button></li>
+          <li class="admin-only"><button class="admin-nav-tab" data-view="audit">📜 <span>Audit Logs</span></button></li>
+        </ul>
+      </nav>
+
+      <div class="nav-user-ctrl">
+        <div class="officer-badge">
+          <span class="officer-dot"></span>
+          <span id="officerName">Officer</span>
+          <span id="officerRole" style="color: var(--aws-orange); font-size: 0.75rem; font-weight: 600;"></span>
+        </div>
+        <button class="btn-logout" id="btnLogout">Sign Out</button>
+      </div>
+    </header>
+
+    <!-- Login Screen View (Shown when unauthenticated) -->
+    <div class="login-screen-wrap" id="loginScreen">
+      <div class="login-card">
+        <img src="../assets/shared/components/AWS-NewLogo.webp" alt="AWS SBG JRU" class="login-logo" />
+        <h1 class="login-title">Officer Portal</h1>
+        <p class="login-subtitle">Sign in to review AWS SBG JRU membership applications</p>
+
+        <form class="login-form" id="loginForm">
+          <div class="form-group">
+            <label for="loginEmail">Officer Email</label>
+            <input type="email" id="loginEmail" placeholder="officer@awssbgjru.me" required />
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required />
+          </div>
+          <button type="submit" class="btn-primary-block">Sign In as Officer</button>
+        </form>
+
+        <button class="dev-bypass-btn" id="devBypassBtn">
+          ⚡ Quick Dev Mode Bypass (Local Testing)
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Admin Workspace Container -->
+    <main class="admin-container" id="adminMainContent" style="display: none;">
+      
+      <!-- VIEW 1: Dashboard -->
+      <section class="admin-view active" id="view-dashboard">
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-orange">
+            <div class="kpi-label">Total Applications <span>📋</span></div>
+            <div class="kpi-val" id="metricTotal">0</div>
+          </div>
+          <div class="kpi-card kpi-cyan">
+            <div class="kpi-label">Median Turnaround <span>⚡</span></div>
+            <div class="kpi-val" id="metricTurnaround">0 hrs</div>
+          </div>
+          <div class="kpi-card kpi-cyan">
+            <div class="kpi-label">New in Queue <span>✨</span></div>
+            <div class="kpi-val" id="metricNew">0</div>
+          </div>
+          <div class="kpi-card kpi-yellow">
+            <div class="kpi-label">Under Review <span>🔍</span></div>
+            <div class="kpi-val" id="metricUnderReview">0</div>
+          </div>
+          <div class="kpi-card kpi-green">
+            <div class="kpi-label">Approved <span>✅</span></div>
+            <div class="kpi-val" id="metricApproved">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Revision Needed <span>📝</span></div>
+            <div class="kpi-val" id="metricRevision" style="color: var(--accent-purple);">0</div>
+          </div>
+          <div class="kpi-card kpi-red">
+            <div class="kpi-label">Declined <span>❌</span></div>
+            <div class="kpi-val" id="metricDeclined">0</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 style="font-size: 1.1rem; font-weight: 600;">Incoming Applications Waiting for Review</h2>
+          <button class="btn-sm btn-primary-sm" onclick="switchView('queue')">View Full Queue →</button>
+        </div>
+
+        <div class="table-container">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Program & Year</th>
+                <th>Division</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="recentQueueBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- VIEW 2: Application Queue -->
+      <section class="admin-view" id="view-queue">
+        <!-- Status Pills -->
+        <div class="status-pill-strip">
+          <button class="status-pill-btn active" data-status="all">All <span class="status-pill-count">0</span></button>
+          <button class="status-pill-btn" data-status="new">New <span class="status-pill-count">0</span></button>
+          <button class="status-pill-btn" data-status="under_review">Under Review <span class="status-pill-count">0</span></button>
+          <button class="status-pill-btn" data-status="revision_requested">Revision Requested <span class="status-pill-count">0</span></button>
+          <button class="status-pill-btn" data-status="resubmitted">Resubmitted <span class="status-pill-count">0</span></button>
+          <button class="status-pill-btn" data-status="approved">Approved <span class="status-pill-count">0</span></button>
+          <button class="status-pill-btn" data-status="declined">Declined <span class="status-pill-count">0</span></button>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="filter-group">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" class="search-input" id="queueSearchInput" placeholder="Search by name, student number, or email..." />
+            </div>
+
+            <select class="filter-select" id="filterYear">
+              <option value="">All Years</option>
+              <option value="First Year">First Year</option>
+              <option value="Second Year">Second Year</option>
+              <option value="Third Year">Third Year</option>
+              <option value="Fourth Year">Fourth Year</option>
+            </select>
+
+            <select class="filter-select" id="filterProgram">
+              <option value="">All Programs</option>
+              <option value="BS Information Technology">BSIT</option>
+              <option value="BSIT Business Analytics">BSIT Analytics</option>
+              <option value="BS Computer Engineering">BSCpE</option>
+              <option value="BS Electronics Engineering">BSECE</option>
+              <option value="BS Entertainment and Multimedia Computing">BSEMC</option>
+              <option value="BS Game Development">BS Game Dev</option>
+              <option value="BS Digital Animation Technology">BS Animation</option>
+              <option value="BSBA">BSBA</option>
+            </select>
+
+            <select class="filter-select" id="filterDivision">
+              <option value="">All Division Types</option>
+              <option value="office">Office</option>
+              <option value="skillbuilder">Skill Builder</option>
+            </select>
+          </div>
+
+          <button class="btn-sm" onclick="exportCsv()">📥 Export CSV</button>
+        </div>
+
+        <!-- Queue Table -->
+        <div class="table-container">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Email</th>
+                <th>Program</th>
+                <th>Division</th>
+                <th>Status</th>
+                <th>Assignment</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="queueTableBody"></tbody>
+          </table>
+
+          <div class="pagination-wrap">
+            <span id="paginationInfo">Showing 0-0 of 0 applications</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn-sm" id="queuePrevPage">Previous</button>
+              <button class="btn-sm" id="queueNextPage">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: Email Templates -->
+      <section class="admin-view" id="view-templates">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1.2rem; font-weight: 600; margin-bottom: 0.35rem;">Standard Email Templates</h2>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);">Manage and standardize automated and officer-dispatched communication.</p>
+        </div>
+
+        <div class="status-pill-strip" id="templateTabsList" style="margin-bottom: 1.5rem;"></div>
+
+        <div class="table-container" style="padding: 1.75rem;">
+          <input type="hidden" id="tmplEditId" />
+          <div class="form-group">
+            <label>Template Name</label>
+            <input type="text" id="tmplEditName" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: #fff; padding: 0.5rem 0.85rem; width: 100%;" />
+          </div>
+          <div class="form-group">
+            <label>Email Subject Line</label>
+            <input type="text" id="tmplEditSubject" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: #fff; padding: 0.5rem 0.85rem; width: 100%;" />
+          </div>
+          <div class="form-group">
+            <label>Message Body</label>
+            <textarea id="tmplEditBody" class="email-body-editor" style="min-height: 220px;"></textarea>
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <label style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Available Variables (Click to insert)</label>
+            <div id="tmplVarsContainer"></div>
+          </div>
+
+          <button class="btn-sm btn-primary-sm admin-only" onclick="saveTemplateChanges()">Save Template Updates</button>
+        </div>
+      </section>
+
+      <!-- VIEW 4: Settings -->
+      <section class="admin-view" id="view-settings">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1.2rem; font-weight: 600; margin-bottom: 0.35rem;">Operational Settings</h2>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);">Configure registration availability and review rules.</p>
+        </div>
+
+        <div class="table-container" style="padding: 1.75rem; max-width: 800px;">
+          <div class="review-card">
+            <h3 class="review-card-title">Recruitment Portal Status</h3>
+            <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; margin-bottom: 1rem;">
+              <input type="checkbox" id="settingRegistrationOpen" style="width: 20px; height: 20px; accent-color: var(--aws-orange);" />
+              <span style="font-weight: 600; font-size: 1rem;">Accepting Membership Applications</span>
+            </label>
+            <div class="form-group">
+              <label>Message displayed to applicants when registration is closed</label>
+              <textarea id="settingClosedMessage" class="email-body-editor" style="min-height: 90px;"></textarea>
+            </div>
+            <button class="btn-sm btn-primary-sm" onclick="saveSettings()">Save Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: Audit Logs -->
+      <section class="admin-view" id="view-audit">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1.2rem; font-weight: 600; margin-bottom: 0.35rem;">Operational Audit Trail</h2>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);">Complete record of reviewer actions, decisions, and system events.</p>
+        </div>
+
+        <div class="table-container">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Timestamp (UTC)</th>
+                <th>Officer</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditLogTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Review Workspace Modal -->
+    <div class="modal-overlay" id="reviewModalOverlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div>
+            <span class="modal-header-title" id="modalApplicantName">Applicant Profile</span>
+            <span id="modalStatusBadge" style="margin-left: 0.75rem;"></span>
+          </div>
+          <button class="modal-close-btn" onclick="closeReviewModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="review-workspace-grid">
+            <!-- Left: Candidate Details & Essay -->
+            <div>
+              <div class="review-card">
+                <img id="modalPhotoPreview" src="" alt="Applicant Photo" class="applicant-photo-preview" style="display: none;" />
+                <div class="field-pair">
+                  <div class="field-pair-label">Student Number</div>
+                  <div class="field-pair-val" id="modalStudentId">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">JRU Email</div>
+                  <div class="field-pair-val" id="modalEmail">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">Program & Year</div>
+                  <div class="field-pair-val" id="modalProgram">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">Date of Birth</div>
+                  <div class="field-pair-val" id="modalDob">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">Selected Division</div>
+                  <div class="field-pair-val" id="modalDivision" style="color: var(--aws-orange);">-</div>
+                </div>
+              </div>
+
+              <div class="review-card">
+                <div class="review-card-title">Statement of Interest / Why join AWS SBG JRU?</div>
+                <div class="applicant-essay-box" id="modalExplanation"></div>
+              </div>
+            </div>
+
+            <!-- Right: Rubric Checklist & Internal Notes -->
+            <div>
+              <div class="review-card">
+                <div class="review-card-title">
+                  <span>Review Assignment</span>
+                  <button id="btnModalClaim" class="btn-sm btn-primary-sm">Claim Application</button>
+                </div>
+                <p style="font-size: 0.75rem; color: var(--text-muted);">Claiming locks this application for 30 minutes to prevent duplicate reviews.</p>
+              </div>
+
+              <div class="review-card">
+                <div class="review-card-title">Qualification Rubric Support</div>
+                <div id="rubricContainer"></div>
+              </div>
+
+              <div class="review-card">
+                <div class="review-card-title">Internal Officer Notes (Private)</div>
+                <div class="notes-thread" id="notesThread"></div>
+                <div class="note-input-row">
+                  <input type="text" id="inputQuickNote" placeholder="Add an internal observation..." />
+                  <button class="btn-sm" onclick="submitQuickNote()">Add Note</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision Action Bar -->
+        <div class="modal-footer">
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            Human-in-the-loop: Every decision requires officer confirmation.
+          </div>
+          <div class="decision-btn-group">
+            <button class="btn-decision btn-pending" onclick="initiateDecision('pending')">Keep Pending</button>
+            <button class="btn-decision btn-revision" onclick="initiateDecision('revision_requested')">Request Revision</button>
+            <button class="btn-decision btn-decline" onclick="initiateDecision('declined')">Decline</button>
+            <button class="btn-decision btn-approve" onclick="initiateDecision('approved')">Approve Applicant</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email Preview & Confirmation Modal -->
+    <div class="modal-overlay" id="emailModalOverlay">
+      <div class="modal-box" style="max-width: 750px;">
+        <div class="modal-header">
+          <span class="modal-header-title" id="confirmDecisionTitle">Confirm Decision & Send Email</span>
+          <button class="modal-close-btn" onclick="closeEmailModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="email-meta-line">
+            <span>Recipient:</span>
+            <strong id="emailRecipient">student@jru.edu</strong>
+          </div>
+
+          <!-- Dynamic conditional input fields -->
+          <div class="form-group" id="inputNextStepsGroup" style="display: none;">
+            <label>Next Steps for Acceptance</label>
+            <input type="text" id="inputNextSteps" placeholder="Join Discord link or orientation schedule..." oninput="refreshEmailPreview()" />
+          </div>
+
+          <div class="form-group" id="inputRevisionGroup" style="display: none;">
+            <label>Specific Incomplete / Weak Answers to Revise</label>
+            <textarea id="inputRevisionNotes" class="email-body-editor" style="min-height: 80px;" placeholder="Please clarify why you want to join..." oninput="refreshEmailPreview()"></textarea>
+            <div style="margin-top: 0.5rem;">
+              <label>Revision Deadline (optional)</label>
+              <input type="text" id="inputRevisionDeadline" placeholder="e.g. 3 days from now" oninput="refreshEmailPreview()" />
+            </div>
+          </div>
+
+          <div class="form-group" id="inputDeclineGroup" style="display: none;">
+            <label>Decline Reason Code (optional)</label>
+            <input type="text" id="inputDeclineReason" placeholder="Due to team capacity limits..." oninput="refreshEmailPreview()" />
+          </div>
+
+          <div class="email-preview-box">
+            <div class="form-group">
+              <label>Preview Subject</label>
+              <input type="text" id="emailSubject" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: #fff; width: 100%; padding: 0.5rem; border-radius: var(--radius-sm);" />
+            </div>
+            <div class="form-group">
+              <label>Preview Body (Editable)</label>
+              <textarea id="emailBody" class="email-body-editor"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-sm" onclick="closeEmailModal()">Cancel</button>
+          <button class="btn-decision btn-approve" id="btnConfirmSend" onclick="confirmAndDispatch()">
+            Confirm & Send Email
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Alerts Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="../js/admin.js"></script>
+  </body>
+</html>

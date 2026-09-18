@@ -16,6 +16,8 @@ from backend.api.config import GROQ_MODEL
 from backend.api.rate_limiter import RateLimiter
 from backend.api.cache import TTLCache
 from backend.routers.registration import router as registration_router
+from backend.routers.admin import router as admin_router
+from backend.routers.revision import router as revision_router
 
 app = FastAPI(title="AWS Student Builder Group - JRU API")
 
@@ -27,6 +29,9 @@ app.add_middleware(
 )
 
 app.include_router(registration_router)
+app.include_router(admin_router)
+app.include_router(revision_router)
+
 
 limiter = RateLimiter()
 response_cache = TTLCache()

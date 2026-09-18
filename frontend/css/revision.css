@@ -1,0 +1,184 @@
+/* ==========================================================================
+   AWS SBG JRU - Applicant Revision Page Stylesheet
+   ========================================================================== */
+
+:root {
+  --bg-primary: #070b19;
+  --bg-surface: #0e152e;
+  --bg-card: #152042;
+  --border-color: rgba(255, 255, 255, 0.08);
+
+  --aws-orange: #ff9900;
+  --aws-orange-hover: #ffad33;
+  --accent-purple: #9b51e0;
+  --accent-green: #00d084;
+  --accent-red: #ff4d4f;
+
+  --text-primary: #ffffff;
+  --text-secondary: #a0aec0;
+  --text-muted: #718096;
+
+  --font-main: "Poppins", sans-serif;
+  --font-mono: monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --shadow-card: 0 12px 36px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body.revision-body {
+  font-family: var(--font-main);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.revision-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  max-width: 680px;
+  width: 100%;
+  padding: 2.5rem;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.revision-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.revision-logo {
+  height: 48px;
+  margin-bottom: 1rem;
+}
+
+.revision-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.revision-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.revision-notice-box {
+  background: rgba(155, 81, 224, 0.12);
+  border: 1px solid rgba(155, 81, 224, 0.35);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.revision-notice-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #c48dfa;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.revision-instructions-text {
+  font-size: 0.9rem;
+  color: #fff;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.revision-meta-tag {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.applicant-summary-box {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.form-control-textarea {
+  width: 100%;
+  min-height: 150px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-control-textarea:focus {
+  border-color: var(--aws-orange);
+}
+
+.btn-submit-revision {
+  width: 100%;
+  background: var(--aws-orange);
+  color: #000;
+  font-weight: 700;
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-submit-revision:hover {
+  background: var(--aws-orange-hover);
+  box-shadow: 0 0 16px rgba(255, 153, 0, 0.3);
+}
+
+.success-state {
+  text-align: center;
+  padding: 2rem 0;
+  display: none;
+}
+
+.success-icon {
+  font-size: 3rem;
+  color: var(--accent-green);
+  margin-bottom: 1rem;
+}

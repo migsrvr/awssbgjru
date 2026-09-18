@@ -20,7 +20,9 @@ from backend.registration_availability import (
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
+from backend.routers.admin import router as admin_router
+from backend.routers.revision import router as revision_router
+from backend.services.application_service import get_system_settings
 
 import chatbot
 import config
@@ -35,6 +37,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(admin_router)
+app.include_router(revision_router)
+
 
 limiter = rate_limiter.RateLimiter()
 register_limiter = rate_limiter.RateLimiter(requests=5, window=60)
@@ -104,7 +110,13 @@ async def register(request: Request):
             {"error": "Rate limit exceeded. Please wait before submitting again."},
             status_code=429,
         )
-    data = await request.json()
+    # Check master registration status
+    settings = get_system_settings()
+    if not settings.get("registration_open", True):
+        return JSONResponse(
+            {"error": settings.get("closed_message", "Registration is currently closed.")},
+            status_code=403,
+        )
 
     website = data.get("website", "")
     if website:
@@ -175,6 +187,7 @@ async def register(request: Request):
         "explanation": data.get("explanation", ""),
         "division_type": division_type,
         "division_name": division_name,
+        "application_status": "new",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 

@@ -50,11 +50,34 @@ class RewriteHandler(http.server.SimpleHTTPRequestHandler):
         else:
             super().do_POST()
 
+    def do_PUT(self):
+        if self.path.startswith("/api/"):
+            self._proxy_api()
+        else:
+            self.send_response(405)
+            self.end_headers()
+
+    def do_DELETE(self):
+        if self.path.startswith("/api/"):
+            self._proxy_api()
+        else:
+            self.send_response(405)
+            self.end_headers()
+
+    def do_OPTIONS(self):
+        if self.path.startswith("/api/"):
+            self._proxy_api()
+        else:
+            self.send_response(200)
+            self.send_header("Allow", "GET, POST, PUT, DELETE, OPTIONS")
+            self.end_headers()
+
     def do_GET(self):
         if self.path.startswith("/api/"):
             self._proxy_api()
         else:
             super().do_GET()
+
 
     def _proxy_api(self):
         backend_url = f"http://localhost:{BACKEND_PORT}{self.path}"
