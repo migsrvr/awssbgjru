@@ -1,30 +1,39 @@
 /* ==========================================================================
    AWS SBG JRU - Applicant Revision Page Stylesheet
+   Theme: Site-matched Light (register system) — white card on orange
+   gradient, navy/blue accents, Poppins + Inter
    ========================================================================== */
 
 :root {
-  --bg-primary: #070b19;
-  --bg-surface: #0e152e;
-  --bg-card: #152042;
-  --border-color: rgba(255, 255, 255, 0.08);
+  --bg-page: linear-gradient(180deg, #f2af00 61.541%, #ff6f08 100%);
+  --bg-card: #ffffff;
+  --bg-input: #eff4fb;
+  --bg-muted: #f8fafc;
+  --border-color: #e5eaf2;
 
-  --aws-orange: #ff9900;
-  --aws-orange-hover: #ffad33;
-  --accent-purple: #9b51e0;
-  --accent-green: #00d084;
-  --accent-red: #ff4d4f;
+  --aws-orange: #ff8400;
+  --aws-orange-deep: #ff6f08;
+  --aws-yellow: #fbb515;
+  --gradient-btn: linear-gradient(180deg, #fff200, #fbb515);
 
-  --text-primary: #ffffff;
-  --text-secondary: #a0aec0;
-  --text-muted: #718096;
+  --navy: #1c3466;
+  --blue: #0026ff;
+  --accent-purple: #7c3aed;
+  --accent-purple-bg: rgba(124, 58, 237, 0.08);
+  --accent-green: #04990c;
+  --accent-red: #d92d20;
+
+  --text-primary: #0f172a;
+  --text-secondary: #434242;
+  --text-muted: #939292;
 
   --font-main: "Poppins", sans-serif;
-  --font-mono: monospace;
+  --font-title: "Inter", "Poppins", sans-serif;
 
   --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 18px;
-  --shadow-card: 0 12px 36px rgba(0, 0, 0, 0.5);
+  --radius-lg: 16px;
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
 * {
@@ -35,7 +44,8 @@
 
 body.revision-body {
   font-family: var(--font-main);
-  background-color: var(--bg-primary);
+  background: var(--bg-page);
+  background-attachment: fixed;
   color: var(--text-primary);
   min-height: 100vh;
   display: flex;
@@ -46,7 +56,7 @@ body.revision-body {
 }
 
 .revision-card {
-  background: var(--bg-surface);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   max-width: 680px;
@@ -68,8 +78,10 @@ body.revision-body {
 }
 
 .revision-title {
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
@@ -78,18 +90,77 @@ body.revision-body {
   color: var(--text-secondary);
 }
 
+.revision-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-family: var(--font-main);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--blue);
+  padding: 5px 22px;
+  border: 2px solid var(--blue);
+  border-radius: 25px;
+  background: #fff;
+  transition: opacity 0.2s;
+  margin-bottom: 1rem;
+}
+
+.revision-back:hover {
+  opacity: 0.7;
+}
+
+.revision-state-loading,
+.revision-state-error {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.revision-state-error {
+  display: none;
+}
+
+.revision-error-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: var(--accent-red);
+}
+
+.revision-error-title {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.revision-error-message {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.revision-home-link {
+  color: var(--aws-orange);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.revision-home-link:hover {
+  text-decoration: underline;
+}
+
 .revision-notice-box {
-  background: rgba(155, 81, 224, 0.12);
-  border: 1px solid rgba(155, 81, 224, 0.35);
+  background: var(--accent-purple-bg);
+  border: 1px solid rgba(124, 58, 237, 0.35);
   border-radius: var(--radius-md);
   padding: 1.25rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .revision-notice-title {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #c48dfa;
+  color: var(--accent-purple);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -98,26 +169,32 @@ body.revision-body {
 
 .revision-instructions-text {
   font-size: 0.9rem;
-  color: #fff;
+  color: var(--text-primary);
   line-height: 1.5;
   white-space: pre-wrap;
 }
 
 .revision-meta-tag {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   margin-top: 0.5rem;
 }
 
 .applicant-summary-box {
-  background: var(--bg-card);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: 1rem;
   margin-bottom: 1.5rem;
   font-size: 0.85rem;
+  color: var(--text-secondary);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
+}
+
+.applicant-summary-box strong {
+  color: var(--text-primary);
 }
 
 .form-group {
@@ -135,40 +212,50 @@ body.revision-body {
 .form-control-textarea {
   width: 100%;
   min-height: 150px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  color: #fff;
+  color: var(--text-primary);
   font-family: inherit;
   font-size: 0.9rem;
   padding: 0.85rem;
   line-height: 1.5;
   resize: vertical;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.form-control-textarea::placeholder {
+  color: #b6bcc7;
 }
 
 .form-control-textarea:focus {
   border-color: var(--aws-orange);
+  background: #fff;
 }
 
 .btn-submit-revision {
   width: 100%;
-  background: var(--aws-orange);
+  background: var(--gradient-btn);
   color: #000;
-  font-weight: 700;
-  font-family: inherit;
+  font-weight: 600;
+  font-family: var(--font-title);
   font-size: 1rem;
   padding: 0.85rem;
-  border-radius: var(--radius-sm);
+  border-radius: 22px;
   border: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: opacity 0.2s;
+  box-shadow: 0 0 6px rgba(255, 203, 13, 0.35);
 }
 
 .btn-submit-revision:hover {
-  background: var(--aws-orange-hover);
-  box-shadow: 0 0 16px rgba(255, 153, 0, 0.3);
+  opacity: 0.85;
+}
+
+.btn-submit-revision:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .success-state {
@@ -177,8 +264,54 @@ body.revision-body {
   display: none;
 }
 
-.success-icon {
-  font-size: 3rem;
+.success-state-title {
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  font-weight: 600;
   color: var(--accent-green);
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.success-state-text {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.success-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: rgba(4, 153, 12, 0.1);
+  border: 2px solid var(--accent-green);
+  color: var(--accent-green);
+  font-size: 2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-home {
+  display: inline-block;
+  background: var(--gradient-btn);
+  color: #000;
+  padding: 0.65rem 1.5rem;
+  border-radius: 22px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.btn-home:hover {
+  opacity: 0.85;
+}
+
+@media (max-width: 640px) {
+  .revision-card {
+    padding: 1.5rem 1.25rem 2rem;
+  }
+  .applicant-summary-box {
+    grid-template-columns: 1fr;
+  }
 }

@@ -10,13 +10,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../css/revision.css" />
   </head>
   <body class="revision-body">
     <div class="revision-card">
+      <a href="/" class="revision-back">Back</a>
       <div class="revision-header">
         <img src="../assets/shared/components/AWS-NewLogo.webp" alt="AWS SBG JRU" class="revision-logo" />
         <h1 class="revision-title">Revise Your Application</h1>
@@ -24,16 +25,16 @@
       </div>
 
       <!-- Loading State -->
-      <div id="loadingWrap" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+      <div id="loadingWrap" class="revision-state-loading">
         Validating secure revision link...
       </div>
 
       <!-- Error State -->
-      <div id="errorWrap" style="display: none; text-align: center; padding: 2rem;">
-        <div style="font-size: 2.5rem; margin-bottom: 1rem; color: var(--accent-red);">⚠️</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Link Unavailable</h2>
-        <p id="errorMessage" style="color: var(--text-secondary); margin-bottom: 1.5rem;"></p>
-        <a href="/" style="color: var(--aws-orange); text-decoration: none; font-weight: 600;">Return to Home</a>
+      <div id="errorWrap" class="revision-state-error">
+        <div class="revision-error-icon">!</div>
+        <h2 class="revision-error-title">Link Unavailable</h2>
+        <p id="errorMessage" class="revision-error-message"></p>
+        <a href="/" class="revision-home-link">Return to Home</a>
       </div>
 
       <!-- Revision Form State -->
@@ -41,7 +42,7 @@
         <!-- Reviewer Feedback Notice -->
         <div class="revision-notice-box">
           <div class="revision-notice-title">
-            <span>📝</span> Officer Reviewer Feedback
+            Officer Reviewer Feedback
           </div>
           <div class="revision-instructions-text" id="revInstructions"></div>
           <div class="revision-meta-tag" id="revDeadlineTag"></div>
@@ -76,11 +77,11 @@
       <!-- Success State -->
       <div class="success-state" id="successWrap">
         <div class="success-icon">✓</div>
-        <h2 style="font-size: 1.3rem; margin-bottom: 0.5rem;">Revision Submitted!</h2>
-        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+        <h2 class="success-state-title">Revision Submitted!</h2>
+        <p class="success-state-text">
           Thank you for updating your application. Our officer team will re-review your answers and notify you via email.
         </p>
-        <a href="/" style="display: inline-block; background: var(--aws-orange); color: #000; padding: 0.65rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600;">Back to Home</a>
+        <a href="/" class="btn-home">Back to Home</a>
       </div>
     </div>
 

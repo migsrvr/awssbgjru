@@ -144,23 +144,6 @@ function initLogin() {
     });
   }
 
-  const devBypassBtn = document.getElementById("devBypassBtn");
-  if (devBypassBtn) {
-    devBypassBtn.addEventListener("click", () => {
-      state.token = "dev-admin-token";
-      state.user = {
-        id: "dev-officer-001",
-        email: "dev.officer@awssbgjru.local",
-        full_name: "Dev Officer (Administrator)",
-        role: "administrator",
-      };
-      localStorage.setItem("admin_token", state.token);
-      localStorage.setItem("admin_user", JSON.stringify(state.user));
-      document.documentElement.classList.add("admin-authenticated");
-      checkAuth();
-      showToast("Signed in as Local Dev Administrator", "success");
-    });
-  }
 }
 
 async function loginWithCredentials(email, password) {
@@ -308,7 +291,7 @@ function renderRecentQueue(apps) {
   const container = document.getElementById("recentQueueBody");
   if (!container) return;
   if (apps.length === 0) {
-    container.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">No new applications waiting in queue. 🎉</td></tr>`;
+    container.innerHTML = `<tr><td colspan="5" class="empty-state-cell">No new applications waiting in queue.</td></tr>`;
     return;
   }
   container.innerHTML = apps
@@ -435,7 +418,7 @@ function renderQueueTable() {
   if (!tbody) return;
 
   if (state.applications.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:3rem;">No applications match the active filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state-cell empty-state-cell-lg">No applications match the active filters.</td></tr>`;
     return;
   }
 
@@ -446,9 +429,9 @@ function renderQueueTable() {
 
       let claimDisplay = `<span class="claim-tag">Unclaimed</span>`;
       if (isClaimedByMe) {
-        claimDisplay = `<span class="claim-tag claimed-by-me">⭐ Claimed by You</span>`;
+        claimDisplay = `<span class="claim-tag claimed-by-me">Claimed by You</span>`;
       } else if (isClaimedByOther) {
-        claimDisplay = `<span class="claim-tag" title="Review in progress">🔒 ${escapeHtml(app.assigned_reviewer_name || "Officer")}</span>`;
+        claimDisplay = `<span class="claim-tag" title="Review in progress">${escapeHtml(app.assigned_reviewer_name || "Officer")}</span>`;
       }
 
       return `
@@ -638,7 +621,7 @@ function loadAndRenderRubric() {
         .join("");
     })
     .catch(() => {
-      rubricContainer.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;">Standard JRU Enrollment & Authentic Interest checks</p>`;
+      rubricContainer.innerHTML = `<p class="decision-hint">Standard JRU Enrollment & Authentic Interest checks</p>`;
     });
 }
 
@@ -648,7 +631,7 @@ function renderNotesThread(reviews) {
 
   const notesReviews = reviews.filter((r) => r.internal_notes && r.internal_notes.trim());
   if (notesReviews.length === 0) {
-    container.innerHTML = `<div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:0.75rem;">No internal notes added yet.</div>`;
+    container.innerHTML = `<div class="decision-hint" style="text-align:center;padding:0.75rem;">No internal notes added yet.</div>`;
     return;
   }
 
@@ -989,7 +972,7 @@ window.selectTemplate = function (tmplId) {
   const varsContainer = document.getElementById("tmplVarsContainer");
   if (varsContainer) {
     varsContainer.innerHTML = (tmpl.variables || [])
-      .map((v) => `<span class="badge badge-new" style="cursor:pointer;" onclick="insertVarTag('${v}')">{{${v}}}</span>`)
+      .map((v) => `<span class="badge badge-new var-chip" onclick="insertVarTag('${v}')">{{${v}}}</span>`)
       .join(" ");
   }
 };
@@ -1069,7 +1052,7 @@ function loadAuditLogs() {
       const tbody = document.getElementById("auditLogTableBody");
       if (!tbody) return;
       if (logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">No audit logs recorded yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state-cell">No audit logs recorded yet.</td></tr>`;
         return;
       }
       tbody.innerHTML = logs
@@ -1077,11 +1060,11 @@ function loadAuditLogs() {
           const time = new Date(l.created_at).toLocaleString();
           return `
           <tr>
-            <td style="font-family:var(--font-mono);font-size:0.75rem;">${escapeHtml(time)}</td>
+            <td class="mono-cell">${escapeHtml(time)}</td>
             <td><strong>${escapeHtml(l.actor_name)}</strong></td>
             <td><span class="badge badge-new">${escapeHtml(l.action)}</span></td>
             <td>${escapeHtml(l.target_type)} ${l.target_id ? `(#${escapeHtml(l.target_id)})` : ""}</td>
-            <td style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(JSON.stringify(l.details || {}))}</td>
+            <td class="muted-cell">${escapeHtml(JSON.stringify(l.details || {}))}</td>
           </tr>
         `;
         })
