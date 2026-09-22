@@ -102,7 +102,8 @@ async def health():
 def _get_supabase():
     if not hasattr(_get_supabase, "_client"):
         from supabase import create_client
-        _get_supabase._client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+        admin_key = config.SUPABASE_SERVICE_ROLE_KEY or config.SUPABASE_KEY
+        _get_supabase._client = create_client(config.SUPABASE_URL, admin_key)
     return _get_supabase._client
 
 
