@@ -2,18 +2,17 @@ DIVISION_STATUS = {
     "office": {
         "Relations": "open",
         "Operations": "open",
-        "Technology": "open",
         "Creatives": "open",
         "Marketing": "full",
         "Media": "full",
     },
     "skillbuilder": {
-        "Software & Web Dev.": "open",
-        "Security": "full",
+        "Software Development": "open",
+        "Web Development": "full",
+        "UI/UX": "open",
         "Data Analyst": "full",
         "Cloud Computing": "full",
         "Machine Learning & AI": "full",
-        "Advanced Network & Infrastructure": "full",
     },
 }
 

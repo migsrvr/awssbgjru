@@ -14,6 +14,8 @@ class RegistrationRequest(BaseModel):
     division_type: str
     division_name: str
     website: str = ""
+    resume_base64: str = ""
+    resume_filename: str = ""
 
     @field_validator("email")
     @classmethod

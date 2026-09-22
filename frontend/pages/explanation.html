@@ -61,13 +61,37 @@
         <!-- Section title -->
         <h2 class="register-section-title explanation-section-title">Why do you want to be a member of AWS - JRU?</h2>
 
-        <!-- Explanation textarea -->
+        <!-- Explanation textarea & Resume Attachment -->
         <div class="explanation-box">
           <div class="form-group">
             <textarea class="explanation-textarea" id="explanationText" placeholder="Explain here." maxlength="5000"></textarea>
             <div class="form-error" data-for="explanation">
               <span class="error-icon"></span>
               <span class="error-text">Please input a brief explanation</span>
+            </div>
+          </div>
+
+          <!-- Resume Attachment Area -->
+          <div class="resume-attachment-area">
+            <div class="resume-pill-container">
+              <label for="resumeInput" class="resume-attachment-pill" id="btnResumeLabel" tabindex="0" role="button" aria-label="Attach Resume (Optional)">
+                <svg class="resume-clip-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                </svg>
+                <span class="resume-pill-text" id="resumePillText">Attach Resume (Optional)</span>
+              </label>
+              <input type="file" id="resumeInput" accept=".pdf,.doc,.docx,image/*" style="display:none;" />
+              <button type="button" class="btn-remove-resume" id="btnRemoveResume" aria-label="Remove resume" style="display:none;" title="Remove file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <span class="resume-format-hint">Accepted formats: PDF, DOC, DOCX (Max 3MB)</span>
+            <div class="form-error resume-error" data-for="resume" role="status" aria-live="polite">
+              <span class="error-icon"></span>
+              <span class="error-text">File must be under 3MB.</span>
             </div>
           </div>
         </div>

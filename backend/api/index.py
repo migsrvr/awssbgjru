@@ -207,12 +207,25 @@ async def register(request: Request):
         "application_status": "new",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if data.get("resume_base64"):
+        row["resume_base64"] = data.get("resume_base64")
+    if data.get("resume_filename"):
+        row["resume_filename"] = data.get("resume_filename")
 
     try:
         sb = _get_supabase()
         result = sb.table("registrations").insert(row).execute()
     except Exception as e:
-        return JSONResponse({"error": f"Database error: {str(e)}"}, status_code=500)
+        err_msg = str(e).lower()
+        if "column" in err_msg and "does not exist" in err_msg:
+            for col in ("resume_base64", "resume_filename", "status"):
+                row.pop(col, None)
+            try:
+                result = sb.table("registrations").insert(row).execute()
+            except Exception as e2:
+                return JSONResponse({"error": f"Database error: {str(e2)}"}, status_code=500)
+        else:
+            return JSONResponse({"error": f"Database error: {str(e)}"}, status_code=500)
 
     if not result.data:
         return JSONResponse({"error": "Failed to insert registration"}, status_code=500)

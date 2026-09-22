@@ -107,9 +107,23 @@ async def register(request: Request, data: RegistrationRequest):
         "application_status": "new",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if getattr(data, "resume_base64", None):
+        row["resume_base64"] = data.resume_base64
+    if getattr(data, "resume_filename", None):
+        row["resume_filename"] = data.resume_filename
 
     client = get_supabase_admin()
-    result = client.table("registrations").insert(row).execute()
+    try:
+        result = client.table("registrations").insert(row).execute()
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "column" in err_msg and "does not exist" in err_msg:
+            for col in ("resume_base64", "resume_filename", "status"):
+                if col in row:
+                    row.pop(col, None)
+            result = client.table("registrations").insert(row).execute()
+        else:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     if not result.data:
         raise HTTPException(status_code=500, detail="Failed to insert registration")

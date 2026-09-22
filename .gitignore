@@ -25,3 +25,4 @@ node_modules/
 # Scratch / temp
 page-snapshot.md
 register-desktop.txt
+.env*

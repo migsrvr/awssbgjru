@@ -26,11 +26,11 @@ APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 # Valid registration divisions (must match frontend pill options)
 VALID_DIVISIONS = {
     "office": {
-        "Relations", "Operations", "Technology", "Creatives", "Marketing", "Media",
+        "Relations", "Operations", "Creatives", "Marketing", "Media",
     },
     "skillbuilder": {
-        "Software & Web Dev.", "Security", "Data Analyst",
-        "Cloud Computing", "Machine Learning & AI", "Advanced Network & Infrastructure",
+        "Software Development", "Web Development", "UI/UX", "Data Analyst",
+        "Cloud Computing", "Machine Learning & AI",
     },
 }
 

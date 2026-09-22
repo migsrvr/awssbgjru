@@ -14,15 +14,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class RegistrationAvailabilityTest(unittest.TestCase):
-    def test_skill_builder_only_software_is_open(self):
+    def test_skill_builder_availability_statuses(self):
         statuses = DIVISION_STATUS["skillbuilder"]
-        self.assertEqual(statuses["Software & Web Dev."], "open")
+        for name in ("Software Development", "UI/UX"):
+            self.assertEqual(statuses[name], "open")
         for name in (
-            "Security",
+            "Web Development",
             "Data Analyst",
             "Cloud Computing",
             "Machine Learning & AI",
-            "Advanced Network & Infrastructure",
         ):
             self.assertEqual(statuses[name], "full")
             with self.assertRaisesRegex(
@@ -34,7 +34,8 @@ class RegistrationAvailabilityTest(unittest.TestCase):
     def test_office_full_divisions_are_marketing_and_media(self):
         self.assertEqual(DIVISION_STATUS["office"]["Marketing"], "full")
         self.assertEqual(DIVISION_STATUS["office"]["Media"], "full")
-        for name in ("Relations", "Operations", "Technology", "Creatives"):
+        self.assertNotIn("Technology", DIVISION_STATUS["office"])
+        for name in ("Relations", "Operations", "Creatives"):
             self.assertEqual(DIVISION_STATUS["office"][name], "open")
 
     def test_office_year_eligibility_rules(self):
@@ -73,16 +74,15 @@ class RegistrationAvailabilityTest(unittest.TestCase):
             validate_division_eligibility("office", "Creatives", "Fourth Year")
 
         validate_division_eligibility("office", "Operations", "Fourth Year")
-        validate_division_eligibility("office", "Technology", "Third Year")
 
     def test_backend_names_match_canonical_skill_builder_markup(self):
         expected = {
-            "Software & Web Dev.",
-            "Security",
+            "Software Development",
+            "Web Development",
+            "UI/UX",
             "Data Analyst",
             "Cloud Computing",
             "Machine Learning & AI",
-            "Advanced Network & Infrastructure",
         }
         self.assertEqual(VALID_DIVISIONS["skillbuilder"], expected)
 
@@ -97,16 +97,18 @@ class RegistrationAvailabilityTest(unittest.TestCase):
             "Open for <strong>1st year</strong> and <strong>2nd year</strong>",
             office,
         )
+        self.assertNotIn('data-division="Technology"', office)
         for name in ("Marketing", "Media"):
             self.assertIn(
                 f'data-division="{name}" data-availability="full"',
                 office,
             )
             self.assertIn("ribbons/full.svg", office)
-        self.assertIn(
-            'data-division="Software &amp; Web Dev." data-availability="open"',
-            skillbuilder,
-        )
+        for name in ("Software Development", "UI/UX"):
+            self.assertIn(
+                f'data-division="{name}" data-availability="open"',
+                skillbuilder,
+            )
         blue_open = ROOT / "frontend/assets/registration/ribbons/skillbuilder-open.svg"
         self.assertTrue(blue_open.is_file())
         self.assertIn("#1500FF", blue_open.read_text())
@@ -115,21 +117,23 @@ class RegistrationAvailabilityTest(unittest.TestCase):
         self.assertTrue(blue_full.is_file())
         self.assertIn("#1500FF", blue_full.read_text())
         for name in (
-            "Security",
+            "Web Development",
             "Data Analyst",
             "Cloud Computing",
             "Machine Learning & AI",
-            "Advanced Network & Infrastructure",
         ):
             self.assertIn(
                 f'data-division="{name.replace("&", "&amp;")}" data-availability="full"',
                 skillbuilder,
             )
-        self.assertEqual(skillbuilder.count("ribbons/skillbuilder-full.svg"), 5)
+        self.assertNotIn("Security", skillbuilder)
+        self.assertNotIn("Advanced Network &amp; Infrastructure", skillbuilder)
+        self.assertEqual(skillbuilder.count("ribbons/skillbuilder-open.svg"), 2)
+        self.assertEqual(skillbuilder.count("ribbons/skillbuilder-full.svg"), 4)
         self.assertNotIn("ribbons/full.svg", skillbuilder)
         self.assertEqual(
             skillbuilder.count("This team is full! Please choose another!"),
-            5,
+            4,
         )
         self.assertEqual(
             office.count("This team is full! Please choose another!"),
