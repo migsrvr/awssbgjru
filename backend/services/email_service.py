@@ -40,7 +40,7 @@ DEFAULT_TEMPLATES = {
             "As a member, you will have opportunities to learn, collaborate with fellow students, participate in organizational initiatives, and contribute to the growth of the cloud computing community at Jose Rizal University.\n\n"
             "We look forward to welcoming you to the *AWS Student Builder Group – JRU Chapter*."
         ),
-        "variables": ["Applicant Name", "Applicant First Name", "Role Title", "Division Name"],
+        "variables": ["Applicant Name", "Applicant First Name", "Role Title", "Division Name", "Track Name"],
         "version": 1,
     },
     "revision_requested": {
@@ -137,6 +137,58 @@ def interpolate_template(
     return subject, body
 
 
+def resolve_applicant_role_and_division(applicant: Dict[str, Any]) -> Tuple[str, str, str]:
+    """
+    Dynamically maps applicant division into an official role title and department name.
+    Supports separated tracks:
+      - Software Development -> 'Software Developer' under 'Skill Builder Department'
+      - Web Development -> 'Web Developer' under 'Skill Builder Department'
+      - UI/UX -> 'UI/UX Designer' under 'Skill Builder Department'
+    """
+    div_name = applicant.get("division_name") or "AWS SBG JRU"
+    div_type = (applicant.get("division_type") or "").strip().lower()
+    d_clean = div_name.replace(" Office", "").replace(" Department", "").strip()
+
+    track_name = d_clean
+
+    # Skill Builder specializations
+    if re.search(r"software\s*development", d_clean, re.I):
+        role_title = "Software Developer"
+        division_formatted = "Skill Builder Department"
+    elif re.search(r"web\s*development", d_clean, re.I):
+        role_title = "Web Developer"
+        division_formatted = "Skill Builder Department"
+    elif re.search(r"ui\s*/?\s*ux", d_clean, re.I):
+        role_title = "UI/UX Designer"
+        division_formatted = "Skill Builder Department"
+    elif re.search(r"data\s*analyst|data\s*analytics", d_clean, re.I):
+        role_title = "Data Analyst"
+        division_formatted = "Skill Builder Department"
+    elif re.search(r"cloud\s*computing", d_clean, re.I):
+        role_title = "Cloud Computing Member"
+        division_formatted = "Skill Builder Department"
+    elif re.search(r"machine\s*learning|ai|ml", d_clean, re.I):
+        role_title = "Machine Learning & AI Member"
+        division_formatted = "Skill Builder Department"
+    elif re.search(r"software\s*&\s*web", d_clean, re.I):
+        role_title = "Software & Web Developer"
+        division_formatted = "Skill Builder Department"
+    elif div_type == "skillbuilder":
+        role_title = f"{d_clean} Member"
+        division_formatted = "Skill Builder Department"
+    else:
+        # Office divisions
+        role_title = f"{d_clean} Member" if not d_clean.lower().endswith("member") else d_clean
+        if re.search(r"relations|operations", d_clean, re.I):
+            division_formatted = f"{d_clean} Office"
+        elif re.search(r"creatives|marketing|media", d_clean, re.I):
+            division_formatted = f"{d_clean} Department"
+        else:
+            division_formatted = f"{d_clean} Division"
+
+    return role_title, division_formatted, track_name
+
+
 def build_variables_map(
     applicant: Dict[str, Any],
     next_steps: Optional[str] = None,
@@ -159,14 +211,14 @@ def build_variables_map(
     parts = full_name.strip().split()
     first_name = parts[0] if parts else "Applicant"
 
-    div_name = applicant.get("division_name") or "AWS SBG JRU"
-    role_title = f"{div_name} Member" if not div_name.lower().endswith("member") else div_name
+    role_title, division_formatted, track_name = resolve_applicant_role_and_division(applicant)
 
     return {
         "Applicant Name": full_name,
         "Applicant First Name": first_name,
         "Role Title": role_title,
-        "Division Name": div_name,
+        "Division Name": division_formatted,
+        "Track Name": track_name,
         "Next Steps": next_steps or default_next_steps,
         "Revision Notes": revision_notes or applicant.get("revision_notes") or "Please update your submission.",
         "Revision Link": revision_link,
@@ -245,8 +297,12 @@ def build_html_email(
         else:
             raw_div = division_name or "Division"
             div_clean = raw_div.replace(" Office", "").replace(" Department", "")
-            if any(w in raw_div.lower() for w in ["data", "tech", "cloud", "developer", "software"]):
-                div_label = "Technology Group Chat"
+            if any(w in raw_div.lower() for w in ["creative", "media", "design"]):
+                div_label = "Creatives Group Chat"
+            elif "relation" in raw_div.lower():
+                div_label = "Relations Group Chat"
+            elif "operation" in raw_div.lower():
+                div_label = "Operations Group Chat"
             else:
                 div_label = f"{div_clean} Group Chat"
 

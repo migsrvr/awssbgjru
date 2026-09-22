@@ -676,7 +676,75 @@ state.generalQrBase64 = "";
 state.divisionQrBase64 = "";
 state.activeEmailTab = "compose";
 
-window.initiateDecision = function (decisionType) {
+const QR_ASSETS = {
+  general: "/assets/QRs/GeneralQR.png",
+  relations: "/assets/QRs/RelationsQR.png",
+  operations: "/assets/QRs/OperationalQR.png",
+  creatives: "/assets/QRs/CreativesQR.png",
+};
+
+const qrDataUrlCache = {};
+
+async function loadQrDataUrl(path) {
+  if (!path) return "";
+  if (qrDataUrlCache[path]) return qrDataUrlCache[path];
+
+  try {
+    const resp = await fetch(path);
+    if (!resp.ok) {
+      console.warn(`Could not load QR asset at ${path} (status ${resp.status})`);
+      return "";
+    }
+    const blob = await resp.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Failed converting QR blob to data URL"));
+      reader.readAsDataURL(blob);
+    });
+    if (dataUrl && typeof dataUrl === "string") {
+      qrDataUrlCache[path] = dataUrl;
+    }
+    return dataUrl || "";
+  } catch (err) {
+    console.warn(`Error loading QR image from ${path}:`, err);
+    return "";
+  }
+}
+
+function getDivisionQrConfig(divName) {
+  if (!divName) return null;
+  const d = divName.trim();
+  if (/relation/i.test(d)) {
+    return {
+      path: QR_ASSETS.relations,
+      label: "Relations QR Attached",
+    };
+  }
+  if (/operation/i.test(d)) {
+    return {
+      path: QR_ASSETS.operations,
+      label: "Operations QR Attached",
+    };
+  }
+  if (/creative|media|design/i.test(d)) {
+    return {
+      path: QR_ASSETS.creatives,
+      label: "Creatives QR Attached",
+    };
+  }
+  return null;
+}
+
+function preloadQrAssets() {
+  if (typeof window === "undefined" || !window.location || !window.location.origin) return;
+  Object.values(QR_ASSETS).forEach((url) => {
+    loadQrDataUrl(url).catch(() => {});
+  });
+}
+preloadQrAssets();
+
+window.initiateDecision = async function (decisionType) {
   if (!state.activeApp) return;
   state.pendingDecision = decisionType;
 
@@ -725,18 +793,58 @@ window.initiateDecision = function (decisionType) {
     const linkInput = document.getElementById("inputDivisionChatLink");
 
     if (labelInput) {
-      if (/data|tech|cloud|developer|software/i.test(divName)) {
-        labelInput.value = "Technology Group Chat";
-        if (linkInput && !linkInput.value.trim()) {
-          linkInput.value = "https://m.me/j/Abb8Zoll7JHw3hNg/";
-        }
-      } else if (/creative|media|design/i.test(divName)) {
+      if (/creative|media|design/i.test(divName)) {
         labelInput.value = "Creatives Group Chat";
-        if (linkInput && !linkInput.value.trim()) {
+        if (linkInput) {
           linkInput.value = "https://m.me/j/AbaoQzrJXHAqFy08/";
         }
+      } else if (/relation/i.test(divName)) {
+        labelInput.value = "Relations Group Chat";
+        if (linkInput) {
+          linkInput.value = "";
+        }
+      } else if (/operation/i.test(divName)) {
+        labelInput.value = "Operations Group Chat";
+        if (linkInput) {
+          linkInput.value = "";
+        }
       } else {
-        labelInput.value = `${divClean} Group Chat`;
+        // Skill Builder tracks (Software Development, Web Development, UI/UX, Data, Cloud, AI)
+        // Kept blank per user preference ("keep it blank for now. We dont have the qr for it")
+        labelInput.value = "";
+        if (linkInput) {
+          linkInput.value = "";
+        }
+      }
+    }
+
+    if (decisionType === "approved") {
+      const generalQrPath = QR_ASSETS.general;
+      const divQrConfig = getDivisionQrConfig(divName);
+
+      const [genDataUrl, divDataUrl] = await Promise.all([
+        loadQrDataUrl(generalQrPath),
+        divQrConfig ? loadQrDataUrl(divQrConfig.path) : Promise.resolve(""),
+      ]);
+
+      if (genDataUrl) {
+        state.generalQrBase64 = genDataUrl;
+        const thumb = document.getElementById("imgGeneralQrThumb");
+        const chip = document.getElementById("previewGeneralQr");
+        const labelEl = document.getElementById("textGeneralQrLabel");
+        if (thumb) thumb.src = genDataUrl;
+        if (labelEl) labelEl.textContent = "General QR Attached";
+        if (chip) chip.style.display = "inline-flex";
+      }
+
+      if (divDataUrl && divQrConfig) {
+        state.divisionQrBase64 = divDataUrl;
+        const thumb = document.getElementById("imgDivisionQrThumb");
+        const chip = document.getElementById("previewDivisionQr");
+        const labelEl = document.getElementById("textDivisionQrLabel");
+        if (thumb) thumb.src = divDataUrl;
+        if (labelEl) labelEl.textContent = divQrConfig.label;
+        if (chip) chip.style.display = "inline-flex";
       }
     }
   }
@@ -810,13 +918,17 @@ window.handleQrUpload = function (event, type) {
       state.generalQrBase64 = dataUrl;
       const thumb = document.getElementById("imgGeneralQrThumb");
       const chip = document.getElementById("previewGeneralQr");
+      const labelEl = document.getElementById("textGeneralQrLabel");
       if (thumb) thumb.src = dataUrl;
+      if (labelEl) labelEl.textContent = "General QR Attached";
       if (chip) chip.style.display = "inline-flex";
     } else {
       state.divisionQrBase64 = dataUrl;
       const thumb = document.getElementById("imgDivisionQrThumb");
       const chip = document.getElementById("previewDivisionQr");
+      const labelEl = document.getElementById("textDivisionQrLabel");
       if (thumb) thumb.src = dataUrl;
+      if (labelEl) labelEl.textContent = "Division QR Attached";
       if (chip) chip.style.display = "inline-flex";
     }
     updateVisualPreview();
@@ -1393,4 +1505,13 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    QR_ASSETS,
+    loadQrDataUrl,
+    getDivisionQrConfig,
+    qrDataUrlCache,
+  };
 }

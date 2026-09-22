@@ -84,6 +84,40 @@ class TestAdminServices(unittest.TestCase):
         self.assertEqual(vmap["Revision Deadline"], "Tomorrow")
         self.assertEqual(vmap["Optional General Reason"], "Capacity limit")
 
+    def test_dynamic_role_and_department_resolution(self):
+        from backend.services.email_service import resolve_applicant_role_and_division
+
+        cases = [
+            ({"division_name": "Software Development", "division_type": "skillbuilder"}, ("Software Developer", "Skill Builder Department", "Software Development")),
+            ({"division_name": "Web Development", "division_type": "skillbuilder"}, ("Web Developer", "Skill Builder Department", "Web Development")),
+            ({"division_name": "UI/UX", "division_type": "skillbuilder"}, ("UI/UX Designer", "Skill Builder Department", "UI/UX")),
+            ({"division_name": "Relations", "division_type": "office"}, ("Relations Member", "Relations Office", "Relations")),
+            ({"division_name": "Operations", "division_type": "office"}, ("Operations Member", "Operations Office", "Operations")),
+            ({"division_name": "Creatives", "division_type": "office"}, ("Creatives Member", "Creatives Department", "Creatives")),
+        ]
+        for app, expected in cases:
+            res = resolve_applicant_role_and_division(app)
+            self.assertEqual(res, expected, f"Failed for {app}")
+
+    def test_email_interpolation_for_separated_tracks(self):
+        tmpl = DEFAULT_TEMPLATES["approved"]
+
+        # Software Development applicant
+        app_soft = {"full_name": "Alex Rivera", "division_name": "Software Development", "division_type": "skillbuilder"}
+        _, body_soft = interpolate_template(tmpl, build_variables_map(app_soft))
+        self.assertIn("accepted as a *Software Developer* under the *Skill Builder Department*", body_soft)
+
+        # Web Development applicant
+        app_web = {"full_name": "Jordan Cruz", "division_name": "Web Development", "division_type": "skillbuilder"}
+        _, body_web = interpolate_template(tmpl, build_variables_map(app_web))
+        self.assertIn("accepted as a *Web Developer* under the *Skill Builder Department*", body_web)
+
+        # UI/UX applicant
+        app_uiux = {"full_name": "Taylor Swift", "division_name": "UI/UX", "division_type": "skillbuilder"}
+        _, body_uiux = interpolate_template(tmpl, build_variables_map(app_uiux))
+        self.assertIn("accepted as a *UI/UX Designer* under the *Skill Builder Department*", body_uiux)
+
 
 if __name__ == "__main__":
     unittest.main()
+
