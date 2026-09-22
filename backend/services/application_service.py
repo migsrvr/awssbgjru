@@ -45,13 +45,13 @@ def get_application_queue(
     all_rows = all_res.data or []
 
     status_counts = {
-        "all": len(all_rows),
+        "all": 0,
         "new": 0,
         "under_review": 0,
-        "approved": 0,
         "revision_requested": 0,
         "resubmitted": 0,
         "declined": 0,
+        "approved": 0,
         "closed": 0,
     }
     for r in all_rows:
@@ -60,6 +60,15 @@ def get_application_queue(
             status_counts[s] += 1
         else:
             status_counts["new"] += 1
+
+    # "all" count in the queue represents all reviewable/actionable applications (excluding approved)
+    status_counts["all"] = (
+        status_counts["new"]
+        + status_counts["under_review"]
+        + status_counts["revision_requested"]
+        + status_counts["resubmitted"]
+        + status_counts["declined"]
+    )
 
     # Filtered query
     query = client.table("registrations").select(
@@ -70,6 +79,9 @@ def get_application_queue(
 
     if status_filter and status_filter != "all":
         query = query.eq("application_status", status_filter)
+    else:
+        # Default / "all" queue excludes approved applicants to prevent reviewer confusion
+        query = query.neq("application_status", "approved")
     if year:
         query = query.eq("year", year)
     if program:
@@ -187,8 +199,17 @@ def claim_application(
     }
     if app.get("application_status") == "new":
         updates["application_status"] = "under_review"
+        updates["status"] = "under_review"
 
-    res = client.table("registrations").update(updates).eq("id", application_id).execute()
+    try:
+        res = client.table("registrations").update(updates).eq("id", application_id).execute()
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "column" in err_msg and "does not exist" in err_msg and "status" in err_msg:
+            updates.pop("status", None)
+            res = client.table("registrations").update(updates).eq("id", application_id).execute()
+        else:
+            raise
     log_action(
         actor_id=officer_id,
         actor_name=officer_name,
@@ -293,6 +314,7 @@ def record_decision(
 
     if decision != "pending":
         reg_updates["application_status"] = decision
+        reg_updates["status"] = decision
 
     revision_token = None
     if decision == "revision_requested":
@@ -307,8 +329,16 @@ def record_decision(
             default_deadline = now + datetime.timedelta(days=3)
             reg_updates["revision_deadline"] = default_deadline.strftime("%Y-%m-%d %H:%M UTC")
 
-    # Update registration record
-    client.table("registrations").update(reg_updates).eq("id", application_id).execute()
+    # Update registration record (with graceful fallback if 'status' column doesn't exist)
+    try:
+        client.table("registrations").update(reg_updates).eq("id", application_id).execute()
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "column" in err_msg and "does not exist" in err_msg and "status" in err_msg:
+            reg_updates.pop("status", None)
+            client.table("registrations").update(reg_updates).eq("id", application_id).execute()
+        else:
+            raise
 
     # Record review log
     review_row = {

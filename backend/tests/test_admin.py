@@ -117,7 +117,64 @@ class TestAdminServices(unittest.TestCase):
         _, body_uiux = interpolate_template(tmpl, build_variables_map(app_uiux))
         self.assertIn("accepted as a *UI/UX Designer* under the *Skill Builder Department*", body_uiux)
 
+    def test_get_application_queue_excludes_approved_by_default(self):
+        from unittest.mock import MagicMock, patch
+        from backend.services.application_service import get_application_queue
+
+        mock_client = MagicMock()
+        # Mock table("registrations").select("id, application_status").execute()
+        mock_counts_query = MagicMock()
+        mock_counts_query.execute.return_value.data = [
+            {"id": 1, "application_status": "new"},
+            {"id": 2, "application_status": "new"},
+            {"id": 3, "application_status": "under_review"},
+            {"id": 4, "application_status": "declined"},
+            {"id": 5, "application_status": "approved"},
+            {"id": 6, "application_status": "approved"},
+        ]
+        
+        mock_data_query = MagicMock()
+        mock_data_query.eq.return_value = mock_data_query
+        mock_data_query.neq.return_value = mock_data_query
+        mock_data_query.order.return_value = mock_data_query
+        mock_data_query.range.return_value = mock_data_query
+        mock_data_query.execute.return_value.data = [
+            {"id": 1, "application_status": "new"},
+            {"id": 2, "application_status": "new"},
+            {"id": 3, "application_status": "under_review"},
+            {"id": 4, "application_status": "declined"},
+        ]
+        mock_data_query.execute.return_value.count = 4
+
+        def table_side_effect(table_name):
+            t = MagicMock()
+            def select_side_effect(cols, **kwargs):
+                if cols == "id, application_status":
+                    return mock_counts_query
+                return mock_data_query
+            t.select.side_effect = select_side_effect
+            return t
+
+        mock_client.table.side_effect = table_side_effect
+
+        with patch("backend.services.application_service.get_supabase_admin", return_value=mock_client):
+            # 1. When status_filter is "all" or None, neq("application_status", "approved") must be called
+            res = get_application_queue(status_filter="all")
+            mock_data_query.neq.assert_called_with("application_status", "approved")
+            self.assertEqual(res["status_counts"]["new"], 2)
+            self.assertEqual(res["status_counts"]["under_review"], 1)
+            self.assertEqual(res["status_counts"]["declined"], 1)
+            self.assertEqual(res["status_counts"]["approved"], 2)
+            # "all" count should only sum active unapproved (2 + 1 + 1 = 4)
+            self.assertEqual(res["status_counts"]["all"], 4)
+
+            # 2. When status_filter is "new", eq("application_status", "new") must be called
+            mock_data_query.reset_mock()
+            res_new = get_application_queue(status_filter="new")
+            mock_data_query.eq.assert_any_call("application_status", "new")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

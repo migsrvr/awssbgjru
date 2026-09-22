@@ -24,7 +24,7 @@ const state = {
   pageSize: 15,
   statusCounts: {},
   filters: {
-    status: "all",
+    status: "new",
     search: "",
     year: "",
     program: "",
@@ -1229,6 +1229,15 @@ function applyOptimisticDecision(appId, decision, payload) {
     appInList.decision_reason_code = payload.reason_code || payload.decline_reason || null;
   }
 
+  // If approved or if status no longer matches active filter, remove from list view immediately
+  if (newStatus === "approved" || (state.filters.status !== "all" && newStatus !== state.filters.status)) {
+    const idx = state.applications.findIndex((a) => a.id === appId);
+    if (idx !== -1) {
+      state.applications.splice(idx, 1);
+      state.total = Math.max(0, state.total - 1);
+    }
+  }
+
   // 2. Instantly update Queue Table
   renderQueueTable();
 
@@ -1237,7 +1246,12 @@ function applyOptimisticDecision(appId, decision, payload) {
     if (oldStatus in state.statusCounts) {
       state.statusCounts[oldStatus] = Math.max(0, (state.statusCounts[oldStatus] || 0) - 1);
     }
-    state.statusCounts[newStatus] = (state.statusCounts[newStatus] || 0) + 1;
+    if (newStatus in state.statusCounts) {
+      state.statusCounts[newStatus] = (state.statusCounts[newStatus] || 0) + 1;
+    }
+    if (newStatus === "approved" && oldStatus !== "approved") {
+      state.statusCounts["all"] = Math.max(0, (state.statusCounts["all"] || 0) - 1);
+    }
     updateStatusCounters();
   }
 
