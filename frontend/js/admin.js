@@ -65,6 +65,11 @@ const state = {
   syncTimer: null,
   syncChannel: null,
   syncWatcherAttached: false,
+  reviewReturnView: "queue",
+  activeResumeBlobUrl: null,
+  activeResumeFilename: null,
+  activeResumeMimeType: null,
+  aiReqSeq: 0,
 };
 
 const ADMIN_CACHE_KEY = "awssbg_admin_cache_v1";
@@ -255,12 +260,18 @@ function checkAuth() {
   // Hydrate cached admin views synchronously before switching view (0ms warm boot)
   const hadWarmCache = restoreAdminCache();
 
-  // Restore view from URL hash or previous session
+  // Restore view from URL hash or previous session (supports #review/<id>)
   const validViews = ["dashboard", "queue", "departments", "templates", "settings", "audit"];
   const hash = window.location.hash.replace("#", "").trim();
-  const savedView = localStorage.getItem("admin_active_view");
-  const initialView = validViews.includes(hash) ? hash : (validViews.includes(savedView) ? savedView : "dashboard");
-  switchView(initialView);
+  const reviewMatch = hash.match(/^review\/(\d+)$/);
+  if (reviewMatch) {
+    state.reviewReturnView = "queue";
+    openReviewModal(parseInt(reviewMatch[1], 10));
+  } else {
+    const savedView = localStorage.getItem("admin_active_view");
+    const initialView = validViews.includes(hash) ? hash : (validViews.includes(savedView) ? savedView : "dashboard");
+    switchView(initialView);
+  }
 
   // Preload Dashboard + all other admin pages in background and start POST-mutation watcher
   preloadAllAdminViews({ force: false });
@@ -926,20 +937,57 @@ function updatePaginationControls() {
   if (next) next.disabled = end >= state.total;
 }
 
-// ---------------- Review Workspace Modal ----------------
-window.openReviewModal = function (appId) {
-  const reqId = ++state.reqSeq.modal;
+// ---------------- Full-Page Applicant Review Workspace ----------------
+function revokeActiveResumeBlob() {
+  if (state.activeResumeBlobUrl) {
+    try {
+      URL.revokeObjectURL(state.activeResumeBlobUrl);
+    } catch (_) {}
+    state.activeResumeBlobUrl = null;
+  }
+  state.activeResumeFilename = null;
+  state.activeResumeMimeType = null;
+}
 
-  // Instantly open modal with cached summary from queue/dashboard so clicks feel immediate
+function showReviewPage(appId) {
+  state.currentView = "review";
+  window.location.hash = `review/${appId}`;
+  document.querySelectorAll(".admin-nav-tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.view === state.reviewReturnView);
+  });
+  document.querySelectorAll(".admin-view").forEach((v) => {
+    v.classList.remove("active");
+  });
+  const reviewSection = document.getElementById("view-review");
+  if (reviewSection) reviewSection.classList.add("active");
+
+  const backLabel = document.getElementById("reviewBackLabel");
+  if (backLabel) {
+    backLabel.textContent = state.reviewReturnView === "dashboard" ? "Back to Dashboard" : "Back to Queue";
+  }
+  if (typeof window !== "undefined" && window.scrollTo) {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+}
+
+window.openReviewModal = function (appId) {
+  if (state.currentView && state.currentView !== "review") {
+    state.reviewReturnView = state.currentView;
+  }
+  const reqId = ++state.reqSeq.modal;
+  revokeActiveResumeBlob();
+  showReviewPage(appId);
+
   const previewSummary =
     state.applications.find((a) => a.id === appId) ||
     state.recentApplications.find((a) => a.id === appId);
 
-  const overlay = document.getElementById("reviewModalOverlay");
   if (previewSummary) {
     state.activeApp = { ...previewSummary, reviews: [], email_logs: [] };
     renderReviewModal(state.activeApp, true);
-    if (overlay) overlay.classList.add("active");
+  } else {
+    renderCvViewerState("loading");
+    renderAtsInsightsState("loading");
   }
 
   fetch(`${API_BASE}/api/v1/admin/applications/${appId}`, { headers: getHeaders() })
@@ -951,7 +999,14 @@ window.openReviewModal = function (appId) {
       if (reqId !== state.reqSeq.modal) return;
       state.activeApp = app;
       renderReviewModal(app, false);
-      if (overlay) overlay.classList.add("active");
+      loadApplicantResumeViewer(app, reqId);
+
+      // Auto-trigger ATS AI evaluation once for unevaluated applicants; reuse DB cache otherwise (0 tokens)
+      if (app.ai_evaluation && typeof app.ai_evaluation === "object" && app.ai_evaluation.summary) {
+        renderAtsInsights(app.ai_evaluation, true);
+      } else {
+        triggerAiEvaluation(false);
+      }
     })
     .catch((err) => {
       if (reqId !== state.reqSeq.modal) return;
@@ -959,19 +1014,24 @@ window.openReviewModal = function (appId) {
     });
 };
 
-function closeReviewModal() {
+window.closeReviewModal = function () {
   state.reqSeq.modal++;
-  document.getElementById("reviewModalOverlay").classList.remove("active");
+  state.aiReqSeq++;
+  revokeActiveResumeBlob();
   state.activeApp = null;
-}
+  switchView(state.reviewReturnView || "queue");
+};
 
 function renderReviewModal(app, isPreviewLoading = false) {
-  document.getElementById("modalApplicantName").textContent = app.full_name;
-  document.getElementById("modalStudentId").textContent = app.student_id;
-  document.getElementById("modalEmail").textContent = app.email;
-  document.getElementById("modalProgram").textContent = `${app.program} — ${app.year}`;
+  document.getElementById("modalApplicantName").textContent = app.full_name || "Applicant Profile";
+  document.getElementById("modalStudentId").textContent = app.student_id || "-";
+  document.getElementById("modalEmail").textContent = app.email || "-";
+  document.getElementById("modalProgram").textContent = `${app.program || "-"} — ${app.year || "-"}`;
   document.getElementById("modalDob").textContent = app.dob || (isPreviewLoading ? "Loading..." : "Not provided");
-  document.getElementById("modalDivision").textContent = `${app.division_name} (${(app.division_type || "").toUpperCase()})`;
+  const divLabel = `${app.division_name || "-"} (${(app.division_type || "").toUpperCase()})`;
+  document.getElementById("modalDivision").textContent = divLabel;
+  const divChip = document.getElementById("reviewDivisionChip");
+  if (divChip) divChip.textContent = divLabel;
   document.getElementById("modalStatusBadge").innerHTML = `<span class="badge badge-${escapeHtml(app.application_status)}">${escapeHtml((app.application_status || "new").replace("_", " "))}</span>`;
 
   // Photo
@@ -999,16 +1059,305 @@ function renderReviewModal(app, isPreviewLoading = false) {
   // Rubric checklist
   loadAndRenderRubric();
 
-  // Notes Thread
+  // Notes Thread & preview skeletons
   if (isPreviewLoading) {
     const notesEl = document.getElementById("notesThread");
     if (notesEl) {
       notesEl.innerHTML = `<span class="skeleton-bar" style="width:70%;margin:0.5rem 0"></span>`;
     }
+    renderCvViewerState("loading");
+    renderAtsInsightsState("loading");
   } else {
     renderNotesThread(app.reviews || []);
   }
 }
+
+function renderCvViewerState(mode, extra = {}) {
+  const fileEl = document.getElementById("cvFileName");
+  const actionsEl = document.getElementById("cvToolbarActions");
+  const bodyEl = document.getElementById("cvViewerBody");
+  if (!bodyEl) return;
+
+  if (mode === "loading") {
+    if (fileEl) fileEl.textContent = "Loading CV attachment...";
+    if (actionsEl) actionsEl.hidden = true;
+    bodyEl.innerHTML = `<div class="cv-placeholder"><span class="skeleton-bar" style="width:60%;margin:0 auto 12px"></span><span class="skeleton-bar" style="width:40%;margin:0 auto"></span></div>`;
+    return;
+  }
+
+  if (mode === "none") {
+    if (fileEl) fileEl.textContent = "No CV / resume attached";
+    if (actionsEl) actionsEl.hidden = true;
+    bodyEl.innerHTML = `<div class="cv-empty-state">This applicant did not upload a CV or resume. Evaluation is based on their Statement of Interest and academic profile.</div>`;
+    return;
+  }
+
+  if (mode === "error") {
+    if (fileEl) fileEl.textContent = extra.filename || "CV attachment";
+    if (actionsEl) actionsEl.hidden = true;
+    bodyEl.innerHTML = `<div class="cv-empty-state">Unable to preview CV file (${escapeHtml(extra.message || "load error")}).</div>`;
+    return;
+  }
+
+  if (fileEl) fileEl.textContent = extra.filename || "applicant_cv.pdf";
+  if (actionsEl) actionsEl.hidden = false;
+
+  if (mode === "pdf") {
+    bodyEl.innerHTML = `<iframe class="cv-pdf-iframe" src="${extra.blobUrl}" title="Applicant CV PDF"></iframe>`;
+  } else if (mode === "image") {
+    bodyEl.innerHTML = `<div class="cv-image-wrap"><img class="cv-image-preview" src="${extra.blobUrl}" alt="Applicant CV" /></div>`;
+  } else {
+    bodyEl.innerHTML = `<div class="cv-empty-state"><strong>${escapeHtml(extra.filename || "Document")}</strong> cannot be rendered natively in the browser. Use <strong>Download</strong> above to view it locally — ATS AI still extracts and evaluates DOCX text automatically.</div>`;
+  }
+}
+
+function loadApplicantResumeViewer(app, reqId) {
+  if (!app || !app.has_resume) {
+    renderCvViewerState("none");
+    return;
+  }
+
+  renderCvViewerState("loading");
+  const filename = app.resume_filename || "applicant_cv.pdf";
+  const mimeHint = (app.resume_mime_type || "").toLowerCase();
+
+  fetch(`${API_BASE}/api/v1/admin/applications/${app.id}/resume`, {
+    headers: { Authorization: `Bearer ${state.token}` },
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const contentType = (res.headers.get("content-type") || mimeHint || "application/pdf").toLowerCase();
+      return res.blob().then((blob) => ({ blob, contentType }));
+    })
+    .then(({ blob, contentType }) => {
+      if (reqId !== state.reqSeq.modal) return;
+      revokeActiveResumeBlob();
+      const typedBlob = blob.type ? blob : new Blob([blob], { type: contentType });
+      const blobUrl = URL.createObjectURL(typedBlob);
+      state.activeResumeBlobUrl = blobUrl;
+      state.activeResumeFilename = filename;
+      state.activeResumeMimeType = contentType;
+
+      if (contentType.includes("pdf") || filename.toLowerCase().endsWith(".pdf")) {
+        renderCvViewerState("pdf", { blobUrl, filename });
+      } else if (contentType.startsWith("image/")) {
+        renderCvViewerState("image", { blobUrl, filename });
+      } else {
+        renderCvViewerState("other", { blobUrl, filename });
+      }
+    })
+    .catch((err) => {
+      if (reqId !== state.reqSeq.modal) return;
+      renderCvViewerState("error", { filename, message: err.message });
+    });
+}
+
+window.openApplicantResumeInNewTab = function () {
+  if (!state.activeResumeBlobUrl) return;
+  window.open(state.activeResumeBlobUrl, "_blank", "noopener");
+};
+
+window.downloadApplicantResume = function () {
+  if (!state.activeResumeBlobUrl) return;
+  const link = document.createElement("a");
+  link.href = state.activeResumeBlobUrl;
+  link.download = state.activeResumeFilename || "applicant_cv.pdf";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+function renderAtsInsightsState(mode, errorMsg = "") {
+  const hero = document.getElementById("atsHeroSummary");
+  const body = document.getElementById("atsInsightsBody");
+  const btn = document.getElementById("btnReanalyzeAi");
+  if (!body) return;
+
+  if (mode === "loading") {
+    if (btn) btn.disabled = true;
+    if (hero) {
+      hero.innerHTML = `<div class="ats-hero-loading"><span class="skeleton-bar" style="width:52%;height:24px;margin-bottom:10px"></span><span class="skeleton-bar" style="width:82%;height:14px"></span></div>`;
+    }
+    body.innerHTML = `
+      <div class="ats-loading-box">
+        <span class="skeleton-bar" style="width:100%;margin-bottom:10px"></span>
+        <span class="skeleton-bar" style="width:88%;margin-bottom:18px"></span>
+        <span class="skeleton-bar" style="width:74%;margin-bottom:10px"></span>
+        <span class="skeleton-bar" style="width:62%"></span>
+      </div>
+    `;
+    return;
+  }
+
+  if (mode === "error") {
+    if (btn) btn.disabled = false;
+    if (hero) hero.innerHTML = "";
+    body.innerHTML = `
+      <div class="ats-error-box">
+        <p>${escapeHtml(errorMsg || "Could not complete AI evaluation.")}</p>
+        <button type="button" class="btn-primary-navy" onclick="triggerAiEvaluation(true)">Retry ATS Analysis</button>
+      </div>
+    `;
+  }
+}
+
+function renderAtsInsights(ev) {
+  const hero = document.getElementById("atsHeroSummary");
+  const body = document.getElementById("atsInsightsBody");
+  const btn = document.getElementById("btnReanalyzeAi");
+  if (!body || !ev) return;
+
+  if (btn) btn.disabled = false;
+
+  const score = Number.isFinite(Number(ev.fit_score)) ? Number(ev.fit_score) : 0;
+  const scoreTone = score >= 75 ? "score-high" : score >= 50 ? "score-mid" : "score-low";
+  const recMap = {
+    approve: { label: "Recommended: Approve", cls: "rec-approve" },
+    revision_requested: { label: "Recommended: Request Revision", cls: "rec-revision" },
+    declined: { label: "Recommended: Decline", cls: "rec-decline" },
+  };
+  const recInfo = recMap[ev.recommendation] || recMap.revision_requested;
+
+  const selectedDiv = (state.activeApp?.division_name || "").trim();
+  const bestFitDiv = (ev.best_fit_division || "").trim();
+  const hasBetterFit = bestFitDiv && selectedDiv && bestFitDiv.toLowerCase() !== selectedDiv.toLowerCase();
+
+  if (hero) {
+    const headlineText = ev.candidate_headline
+      ? `<p class="ats-hero-headline">${escapeHtml(ev.candidate_headline)}</p>`
+      : "";
+    hero.innerHTML = `
+      <div class="ats-hero-score-row">
+        <div class="ats-score-ring ${scoreTone}">
+          <span class="ats-score-num">${score}</span>
+          <span class="ats-score-max">/100</span>
+        </div>
+        <div class="ats-hero-verdict">
+          <div class="ats-hero-fit-label">${escapeHtml(ev.fit_label || "Evaluated")}</div>
+          <span class="ats-hero-rec-pill ${recInfo.cls}">${escapeHtml(recInfo.label)}</span>
+        </div>
+      </div>
+      ${headlineText}
+    `;
+  }
+
+  const subs = ev.sub_scores || {};
+  const subRows = [
+    { label: "Division Fit", val: Number(subs.division_relevance ?? score) || 0 },
+    { label: "Statement", val: Number(subs.statement_quality ?? score) || 0 },
+    { label: "CV Signal", val: Number(subs.cv_signal ?? 0) || 0 },
+  ];
+
+  const bestFitBanner = hasBetterFit
+    ? `<div class="ats-bestfit-callout">
+        <span class="ats-bestfit-label">Best-Fit Track Match</span>
+        <span class="ats-bestfit-val">Profile aligns strongly with <strong>${escapeHtml(bestFitDiv)}</strong> (applied to ${escapeHtml(selectedDiv)})</span>
+      </div>`
+    : "";
+
+  const skillsHtml = Array.isArray(ev.extracted_skills) && ev.extracted_skills.length > 0
+    ? `<div class="ats-section">
+        <div class="ats-section-label">Verified Skills &amp; Tools</div>
+        <div class="ats-skill-chips">${ev.extracted_skills.map((s) => `<span class="ats-skill-chip">${escapeHtml(s)}</span>`).join("")}</div>
+      </div>`
+    : "";
+
+  const strengthsHtml = Array.isArray(ev.strengths) && ev.strengths.length > 0
+    ? `<div class="ats-callout ats-callout-strengths">
+        <div class="ats-section-label">Key Strengths</div>
+        <ul class="ats-list ats-list-strengths">${ev.strengths.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+      </div>`
+    : "";
+
+  const concernsHtml = Array.isArray(ev.concerns) && ev.concerns.length > 0
+    ? `<div class="ats-callout ats-callout-concerns">
+        <div class="ats-section-label">Concerns &amp; Red Flags</div>
+        <ul class="ats-list ats-list-concerns">${ev.concerns.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
+      </div>`
+    : "";
+
+  const cvStatusLabels = {
+    analyzed_pdf: "PDF CV Analyzed",
+    analyzed_docx: "DOCX CV Analyzed",
+    no_cv: "No CV Uploaded (Statement Only)",
+    image_only: "Image CV (Statement Evaluated)",
+    empty_pdf: "Scanned/Image PDF (No Embedded Text)",
+    unsupported_format: "Unsupported CV Format",
+    parse_error: "CV Unreadable (Statement Evaluated)",
+  };
+  const cvStatusText = cvStatusLabels[ev.cv_status] || ev.cv_status || "Statement Evaluated";
+
+  body.innerHTML = `
+    <div class="ats-subscore-grid">
+      ${subRows
+        .map(
+          (r) => `
+        <div class="ats-subscore-tile">
+          <span class="ats-tile-label">${escapeHtml(r.label)}</span>
+          <strong class="ats-tile-val ${r.val >= 75 ? "tone-high" : r.val >= 50 ? "tone-mid" : "tone-low"}">${r.val}</strong>
+          <div class="ats-meter-track">
+            <div class="ats-meter-fill ${r.val >= 75 ? "score-high" : r.val >= 50 ? "score-mid" : "score-low"}" style="width:${Math.max(0, Math.min(100, r.val))}%"></div>
+          </div>
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+
+    ${bestFitBanner}
+
+    <div class="ats-section">
+      <div class="ats-section-label">Candidate Summary</div>
+      <p class="ats-summary">${escapeHtml(ev.summary || "")}</p>
+    </div>
+
+    ${skillsHtml}
+    ${strengthsHtml}
+    ${concernsHtml}
+
+    <div class="ats-meta-footer">
+      <span>${escapeHtml(cvStatusText)}</span>
+      <span>${escapeHtml(ev.model || "Groq ATS")}</span>
+    </div>
+  `;
+}
+
+window.triggerAiEvaluation = function (forceRefresh = false) {
+  if (!state.activeApp) return;
+  const appId = state.activeApp.id;
+  const aiReqId = ++state.aiReqSeq;
+  renderAtsInsightsState("loading");
+
+  fetch(`${API_BASE}/api/v1/admin/applications/${appId}/ai-evaluate`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ force_refresh: Boolean(forceRefresh) }),
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        let detail = "AI evaluation failed.";
+        try {
+          const errBody = await res.json();
+          detail = errBody.detail || detail;
+        } catch (_) {}
+        throw new Error(detail);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      if (aiReqId !== state.aiReqSeq || !state.activeApp || state.activeApp.id !== appId) return;
+      state.activeApp.ai_evaluation = data.evaluation;
+      state.activeApp.ai_evaluated_at = data.evaluated_at || data.evaluation?.evaluated_at;
+      renderAtsInsights(data.evaluation, Boolean(data.cached));
+      if (!data.cached) {
+        captureCurrentSyncVersion();
+      }
+    })
+    .catch((err) => {
+      if (aiReqId !== state.aiReqSeq) return;
+      renderAtsInsightsState("error", err.message);
+    });
+};
 
 function renderClaimButton(app) {
   const claimBtn = document.getElementById("btnModalClaim");
@@ -1017,11 +1366,11 @@ function renderClaimButton(app) {
   const isClaimedByMe = state.user && app.assigned_reviewer_id === state.user.id;
   if (isClaimedByMe) {
     claimBtn.textContent = "Release Claim";
-    claimBtn.className = "btn-sm";
+    claimBtn.className = "review-act-btn review-act-neutral";
     claimBtn.onclick = () => releaseCurrentApp();
   } else {
-    claimBtn.textContent = "Claim Application";
-    claimBtn.className = "btn-sm btn-primary-sm";
+    claimBtn.textContent = "Claim";
+    claimBtn.className = "review-act-btn review-act-claim";
     claimBtn.onclick = () => claimCurrentApp();
   }
 }
@@ -1796,13 +2145,13 @@ function submitDecisionPayload(payload) {
   const appId = state.activeApp.id;
   const decisionType = payload.decision;
 
-  // 1. INSTANT CLOSE MODALS & INSTANT UI UPDATE (0ms delay!)
+  // 1. INSTANT CLOSE EMAIL MODAL & RETURN TO QUEUE/DASHBOARD (0ms delay!)
   closeEmailModal();
-  document.getElementById("reviewModalOverlay").classList.remove("active");
   state.pendingDecision = null;
 
   // Optimistically update memory and DOM
   applyOptimisticDecision(appId, decisionType, payload);
+  closeReviewModal();
 
   const formattedDecision = decisionType.replace("_", " ").toUpperCase();
   showToast(`Application #${appId} marked as ${formattedDecision}!`, "success");

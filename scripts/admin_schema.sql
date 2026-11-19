@@ -53,6 +53,22 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='revision_requested_fields') THEN
         ALTER TABLE registrations ADD COLUMN revision_requested_fields JSONB DEFAULT '[]'::jsonb;
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='resume_base64') THEN
+        ALTER TABLE registrations ADD COLUMN resume_base64 TEXT DEFAULT NULL;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='resume_filename') THEN
+        ALTER TABLE registrations ADD COLUMN resume_filename TEXT DEFAULT NULL;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='ai_evaluation') THEN
+        ALTER TABLE registrations ADD COLUMN ai_evaluation JSONB DEFAULT NULL;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='ai_evaluated_at') THEN
+        ALTER TABLE registrations ADD COLUMN ai_evaluated_at TIMESTAMPTZ DEFAULT NULL;
+    END IF;
 END $$;
 
 -- Indexes on registrations for rapid filtering

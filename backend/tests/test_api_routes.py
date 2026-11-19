@@ -102,6 +102,51 @@ class TestAdminApiRoutes(unittest.TestCase):
         self.assertIn("templates", data["scopes"])
         self.assertIn("audit", data["scopes"])
 
+    def test_admin_resume_and_ai_evaluate_endpoints(self):
+        from unittest.mock import patch
+
+        # Both require auth
+        self.assertEqual(self.client.get("/api/v1/admin/applications/1/resume").status_code, 401)
+        self.assertEqual(self.client.post("/api/v1/admin/applications/1/ai-evaluate").status_code, 401)
+
+        headers = {"Authorization": "Bearer dev-admin-token"}
+
+        with patch(
+            "backend.routers.admin.get_application_resume",
+            return_value=(b"%PDF-1.4\n%fake", "application/pdf", "cv.pdf"),
+        ):
+            res = self.client.get("/api/v1/admin/applications/1/resume", headers=headers)
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(res.headers["content-type"], "application/pdf")
+            self.assertIn("inline", res.headers.get("content-disposition", ""))
+            self.assertEqual(res.content, b"%PDF-1.4\n%fake")
+
+        fake_eval_response = {
+            "cached": False,
+            "evaluation": {
+                "fit_score": 82,
+                "fit_label": "Strong Fit",
+                "recommendation": "approve",
+                "summary": "Solid fit.",
+                "strengths": ["Clear goals"],
+                "concerns": [],
+                "extracted_skills": ["AWS"],
+                "sub_scores": {"division_relevance": 85, "statement_quality": 80, "cv_signal": 80},
+                "cv_status": "analyzed_pdf",
+            },
+        }
+        with (
+            patch("backend.routers.admin.run_ai_evaluation", return_value=fake_eval_response),
+            patch("backend.routers.admin.bump_sync_version"),
+        ):
+            res_ai = self.client.post(
+                "/api/v1/admin/applications/1/ai-evaluate",
+                headers=headers,
+                json={"force_refresh": False},
+            )
+            self.assertEqual(res_ai.status_code, 200)
+            self.assertEqual(res_ai.json()["evaluation"]["fit_score"], 82)
+
     def test_admin_templates_list(self):
         headers = {"Authorization": "Bearer dev-admin-token"}
         res = self.client.get("/api/v1/admin/templates", headers=headers)
