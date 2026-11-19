@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.routers.admin import router as admin_router
 from backend.routers.revision import router as revision_router
 from backend.services.application_service import get_system_settings
+from backend.services.sync_service import bump_sync_version
 
 import chatbot
 import config
@@ -162,7 +163,11 @@ async def register(request: Request):
     division_type = data.get("division_type", "")
     division_name = data.get("division_name", "")
     try:
-        validate_division_availability(division_type, division_name)
+        validate_division_availability(
+            division_type,
+            division_name,
+            availability=settings.get("division_availability"),
+        )
     except DivisionAvailabilityError as exc:
         return JSONResponse(
             {"error": exc.message, "code": exc.code},
@@ -232,6 +237,7 @@ async def register(request: Request):
         return JSONResponse({"error": "Failed to insert registration"}, status_code=500)
 
     inserted_id = result.data[0]["id"]
+    bump_sync_version("applications", event="new_registration")
 
     try:
         _send_notification(data)

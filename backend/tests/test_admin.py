@@ -173,6 +173,79 @@ class TestAdminServices(unittest.TestCase):
             res_new = get_application_queue(status_filter="new")
             mock_data_query.eq.assert_any_call("application_status", "new")
 
+    def test_system_settings_reads_and_updates_division_availability(self):
+        from unittest.mock import MagicMock, patch
+        from backend.services.application_service import (
+            get_system_settings,
+            update_system_settings,
+        )
+
+        stored_rows = [
+            {
+                "key": "registration_status",
+                "value": {"is_open": True, "closed_message": "Closed"},
+            },
+            {
+                "key": "division_availability",
+                "value": {
+                    "office": {"Operations": "full", "Marketing": "open"},
+                    "skillbuilder": {"Web Development": "open"},
+                },
+            },
+        ]
+
+        mock_client = MagicMock()
+        mock_table = MagicMock()
+        mock_table.select.return_value.execute.return_value.data = stored_rows
+        upserted_payloads = []
+
+        def upsert_side_effect(payload):
+            upserted_payloads.append(payload)
+            return MagicMock(execute=MagicMock(return_value=MagicMock(data=[payload])))
+
+        mock_table.upsert.side_effect = upsert_side_effect
+        mock_client.table.return_value = mock_table
+
+        with patch("backend.services.application_service.get_supabase_admin", return_value=mock_client):
+            settings = get_system_settings()
+            self.assertEqual(settings["division_availability"]["office"]["Operations"], "full")
+            self.assertEqual(settings["division_availability"]["office"]["Marketing"], "open")
+            self.assertEqual(settings["division_availability"]["skillbuilder"]["Web Development"], "open")
+            self.assertEqual(settings["division_availability"]["skillbuilder"]["UI/UX"], "open")
+
+            update_system_settings(
+                division_availability={"office": {"Operations": "open"}},
+                officer_name="Admin Officer",
+            )
+            div_upserts = [p for p in upserted_payloads if p.get("key") == "division_availability"]
+            self.assertEqual(len(div_upserts), 1)
+            self.assertEqual(div_upserts[0]["value"]["office"]["Operations"], "open")
+            self.assertEqual(div_upserts[0]["value"]["office"]["Marketing"], "open")
+            self.assertEqual(div_upserts[0]["updated_by"], "Admin Officer")
+
+    def test_sync_service_bumps_version_and_scopes(self):
+        from backend.services.sync_service import (
+            bump_sync_version,
+            get_sync_state,
+            reset_sync_state_for_tests,
+        )
+
+        reset_sync_state_for_tests()
+        initial = get_sync_state(sync_remote=False)
+        self.assertIn("version", initial)
+        self.assertIn("scopes", initial)
+        start_version = initial["version"]
+
+        after_reg = bump_sync_version("applications", event="new_registration", persist=False)
+        self.assertEqual(after_reg["version"], start_version + 1)
+        self.assertGreater(after_reg["scopes"]["applications"], initial["scopes"]["applications"])
+        self.assertEqual(after_reg["last_event"], "new_registration")
+
+        after_settings = bump_sync_version("settings", event="settings_updated", persist=False)
+        self.assertEqual(after_settings["version"], start_version + 2)
+        self.assertGreater(after_settings["scopes"]["settings"], after_reg["scopes"]["settings"])
+        self.assertEqual(after_settings["scopes"]["applications"], after_reg["scopes"]["applications"])
+
 
 if __name__ == "__main__":
     unittest.main()

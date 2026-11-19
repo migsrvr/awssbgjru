@@ -1,3 +1,5 @@
+from typing import Dict, Mapping, Optional
+
 DIVISION_STATUS = {
     "office": {
         "Relations": "open",
@@ -15,6 +17,39 @@ DIVISION_STATUS = {
         "Machine Learning & AI": "full",
     },
 }
+
+VALID_AVAILABILITY_STATUSES = {"open", "full"}
+
+
+def normalize_division_availability(
+    raw: Optional[Mapping[str, Mapping[str, str]]] = None,
+    base: Optional[Mapping[str, Mapping[str, str]]] = None,
+) -> Dict[str, Dict[str, str]]:
+    """Returns a sanitized copy of division availability merged onto defaults."""
+    source = base if isinstance(base, Mapping) else DIVISION_STATUS
+    merged: Dict[str, Dict[str, str]] = {}
+    for dept, default_divisions in DIVISION_STATUS.items():
+        base_dept = source.get(dept) if isinstance(source.get(dept), Mapping) else {}
+        merged[dept] = {}
+        for name, default_status in default_divisions.items():
+            base_val = base_dept.get(name) if isinstance(base_dept, Mapping) else None
+            merged[dept][name] = (
+                base_val if base_val in VALID_AVAILABILITY_STATUSES else default_status
+            )
+
+    if not isinstance(raw, Mapping):
+        return merged
+
+    for dept, divisions in merged.items():
+        incoming = raw.get(dept)
+        if not isinstance(incoming, Mapping):
+            continue
+        for name in divisions:
+            status_val = incoming.get(name)
+            if status_val in VALID_AVAILABILITY_STATUSES:
+                divisions[name] = status_val
+
+    return merged
 
 DIVISION_ELIGIBILITY = {
     "office": {
@@ -38,7 +73,11 @@ class DivisionAvailabilityError(ValueError):
         self.status_code = status_code
 
 
-def validate_division_availability(division_type: str, division_name: str) -> None:
+def validate_division_availability(
+    division_type: str,
+    division_name: str,
+    availability: Optional[Mapping[str, Mapping[str, str]]] = None,
+) -> None:
     if not isinstance(division_type, str):
         raise DivisionAvailabilityError(
             "invalid_division_type",
@@ -46,7 +85,12 @@ def validate_division_availability(division_type: str, division_name: str) -> No
             422,
         )
 
-    divisions = DIVISION_STATUS.get(division_type)
+    status_map = (
+        normalize_division_availability(availability)
+        if availability is not None
+        else DIVISION_STATUS
+    )
+    divisions = status_map.get(division_type)
     if divisions is None:
         raise DivisionAvailabilityError(
             "invalid_division_type",

@@ -1,9 +1,44 @@
+import hashlib
 import os
-from typing import Optional
+import threading
+import time
+from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
 from fastapi import Header, HTTPException, status, Depends
 from backend.database import get_supabase_admin, supabase
 from backend.api.config import SUPABASE_URL
+
+AUTH_CACHE_TTL_SECONDS = 60.0
+AUTH_CACHE_MAX_ENTRIES = 256
+_AUTH_CACHE: Dict[str, Tuple[float, "OfficerUser"]] = {}
+_AUTH_CACHE_LOCK = threading.Lock()
+
+
+def _get_cached_officer(token: str) -> Optional["OfficerUser"]:
+    key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = time.monotonic()
+    with _AUTH_CACHE_LOCK:
+        entry = _AUTH_CACHE.get(key)
+        if not entry:
+            return None
+        expires_at, officer = entry
+        if now >= expires_at:
+            _AUTH_CACHE.pop(key, None)
+            return None
+        return officer
+
+
+def _cache_officer(token: str, officer: "OfficerUser") -> None:
+    key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = time.monotonic()
+    with _AUTH_CACHE_LOCK:
+        if len(_AUTH_CACHE) >= AUTH_CACHE_MAX_ENTRIES:
+            expired = [k for k, (exp, _) in _AUTH_CACHE.items() if now >= exp]
+            for k in expired:
+                _AUTH_CACHE.pop(k, None)
+            if len(_AUTH_CACHE) >= AUTH_CACHE_MAX_ENTRIES:
+                _AUTH_CACHE.clear()
+        _AUTH_CACHE[key] = (now + AUTH_CACHE_TTL_SECONDS, officer)
 
 
 @dataclass
@@ -14,7 +49,7 @@ class OfficerUser:
     role: str  # 'reviewer' or 'administrator'
 
 
-async def get_current_user(
+def get_current_user(
     authorization: Optional[str] = Header(None),
     x_dev_officer: Optional[str] = Header(None),
 ) -> OfficerUser:
@@ -53,6 +88,10 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    cached = _get_cached_officer(token)
+    if cached is not None:
+        return cached
+
     # Validate with Supabase
     try:
         client = get_supabase_admin()
@@ -78,12 +117,14 @@ async def get_current_user(
 
         if admin_res.data and len(admin_res.data) > 0:
             row = admin_res.data[0]
-            return OfficerUser(
+            officer = OfficerUser(
                 id=str(row.get("id") or user_id),
                 email=row.get("email") or email,
                 full_name=row.get("full_name") or full_name,
                 role=row.get("role") or "reviewer",
             )
+            _cache_officer(token, officer)
+            return officer
 
         # Bootstrap support: If admin_users table is empty, first user becomes administrator
         count_res = client.table("admin_users").select("id", count="exact").limit(1).execute()
@@ -94,12 +135,14 @@ async def get_current_user(
                 "full_name": full_name,
                 "role": "administrator",
             }).execute()
-            return OfficerUser(
+            officer = OfficerUser(
                 id=user_id,
                 email=email,
                 full_name=full_name,
                 role="administrator",
             )
+            _cache_officer(token, officer)
+            return officer
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

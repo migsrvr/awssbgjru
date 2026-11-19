@@ -19,6 +19,9 @@ class TestAdminApiRoutes(unittest.TestCase):
         data = res.json()
         self.assertIn("is_open", data)
         self.assertIn("message", data)
+        self.assertIn("division_availability", data)
+        self.assertIn("office", data["division_availability"])
+        self.assertIn("skillbuilder", data["division_availability"])
 
     def test_admin_me_requires_auth(self):
         res = self.client.get("/api/v1/admin/me")
@@ -40,6 +43,64 @@ class TestAdminApiRoutes(unittest.TestCase):
         data = res.json()
         self.assertIn("registration_open", data)
         self.assertIn("qualification_rubric", data)
+        self.assertIn("division_availability", data)
+
+    def test_admin_settings_update_division_availability_admin_only(self):
+        from unittest.mock import patch
+        from backend.registration_availability import normalize_division_availability
+
+        headers = {"Authorization": "Bearer dev-admin-token"}
+        expected_availability = normalize_division_availability({"office": {"Operations": "full"}})
+        mock_updated = {
+            "registration_open": True,
+            "closed_message": "Closed",
+            "qualification_rubric": [],
+            "division_availability": expected_availability,
+        }
+
+        with (
+            patch("backend.routers.admin.update_system_settings", return_value=mock_updated) as mock_update,
+            patch("backend.routers.admin.log_action"),
+        ):
+            res = self.client.put(
+                "/api/v1/admin/settings",
+                headers=headers,
+                json={"division_availability": {"office": {"Operations": "full"}}},
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(res.json()["division_availability"]["office"]["Operations"], "full")
+            mock_update.assert_called_once()
+
+            # Invalid status literal must be rejected with 422
+            bad_res = self.client.put(
+                "/api/v1/admin/settings",
+                headers=headers,
+                json={"division_availability": {"office": {"Operations": "maybe"}}},
+            )
+            self.assertEqual(bad_res.status_code, 422)
+
+            # Unauthenticated request must be rejected with 401
+            unauth_res = self.client.put(
+                "/api/v1/admin/settings",
+                json={"division_availability": {"office": {"Operations": "full"}}},
+            )
+            self.assertEqual(unauth_res.status_code, 401)
+
+    def test_admin_sync_version_endpoint(self):
+        # Unauthenticated must fail with 401
+        unauth = self.client.get("/api/v1/admin/sync-version")
+        self.assertEqual(unauth.status_code, 401)
+
+        headers = {"Authorization": "Bearer dev-admin-token"}
+        res = self.client.get("/api/v1/admin/sync-version", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("version", data)
+        self.assertIn("scopes", data)
+        self.assertIn("applications", data["scopes"])
+        self.assertIn("settings", data["scopes"])
+        self.assertIn("templates", data["scopes"])
+        self.assertIn("audit", data["scopes"])
 
     def test_admin_templates_list(self):
         headers = {"Authorization": "Bearer dev-admin-token"}

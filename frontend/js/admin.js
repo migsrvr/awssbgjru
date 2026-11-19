@@ -38,7 +38,172 @@ const state = {
     closed_message: "",
   },
   pendingDecision: null, // holds decision type when opening email confirmation modal
+  loaded: {
+    dashboard: false,
+    queue: false,
+    departments: false,
+    templates: false,
+    settings: false,
+    audit: false,
+  },
+  reqSeq: {
+    dashboardMetrics: 0,
+    dashboardQueue: 0,
+    queue: 0,
+    departments: 0,
+    templates: 0,
+    settings: 0,
+    audit: 0,
+    modal: 0,
+  },
+  queueAbortController: null,
+  auditLogs: [],
+  metrics: null,
+  defaultQueueCache: null,
+  syncState: null,
+  preloadStarted: false,
+  syncTimer: null,
+  syncChannel: null,
+  syncWatcherAttached: false,
 };
+
+const ADMIN_CACHE_KEY = "awssbg_admin_cache_v1";
+const SYNC_POLL_INTERVAL_MS = 15000;
+
+function saveAdminCache() {
+  try {
+    if (typeof sessionStorage === "undefined") return;
+    const payload = {
+      savedAt: Date.now(),
+      metrics: state.metrics,
+      recentApplications: state.recentApplications,
+      defaultQueueCache: state.defaultQueueCache,
+      settings: state.settings,
+      templates: state.templates,
+      auditLogs: state.auditLogs,
+      syncState: state.syncState,
+      loaded: state.loaded,
+    };
+    sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(payload));
+  } catch (_) {}
+}
+
+function restoreAdminCache() {
+  try {
+    if (typeof sessionStorage === "undefined") return false;
+    const raw = sessionStorage.getItem(ADMIN_CACHE_KEY);
+    if (!raw) return false;
+    const cached = JSON.parse(raw);
+    if (!cached || typeof cached !== "object") return false;
+
+    if (cached.metrics) {
+      state.metrics = cached.metrics;
+      state.loaded.dashboard = true;
+    }
+    if (Array.isArray(cached.recentApplications)) {
+      state.recentApplications = cached.recentApplications;
+    }
+    if (cached.defaultQueueCache) {
+      state.defaultQueueCache = cached.defaultQueueCache;
+      state.applications = cached.defaultQueueCache.applications || [];
+      state.total = cached.defaultQueueCache.total || 0;
+      state.statusCounts = cached.defaultQueueCache.statusCounts || {};
+      state.loaded.queue = true;
+    }
+    if (cached.settings && typeof cached.settings === "object") {
+      state.settings = cached.settings;
+      if (cached.settings.qualification_rubric) {
+        state.rubricItems = cached.settings.qualification_rubric;
+      }
+      if (cached.settings.division_availability) {
+        state.savedDivisionAvailability = mergeDivisionAvailability(cached.settings.division_availability);
+        state.loaded.departments = true;
+      }
+      if (cached.loaded && cached.loaded.settings) {
+        state.loaded.settings = true;
+      }
+    }
+    if (Array.isArray(cached.templates) && cached.templates.length > 0) {
+      state.templates = cached.templates;
+      state.loaded.templates = true;
+    }
+    if (Array.isArray(cached.auditLogs) && cached.loaded && cached.loaded.audit) {
+      state.auditLogs = cached.auditLogs;
+      state.loaded.audit = true;
+    }
+    if (cached.syncState && typeof cached.syncState.version === "number") {
+      state.syncState = cached.syncState;
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function clearAdminCache() {
+  state.metrics = null;
+  state.recentApplications = [];
+  state.defaultQueueCache = null;
+  state.applications = [];
+  state.total = 0;
+  state.statusCounts = {};
+  state.templates = [];
+  state.auditLogs = [];
+  state.syncState = null;
+  state.preloadStarted = false;
+  Object.keys(state.loaded).forEach((k) => {
+    state.loaded[k] = false;
+  });
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem(ADMIN_CACHE_KEY);
+    }
+  } catch (_) {}
+}
+
+function isDefaultQueueView() {
+  return (
+    state.page === 1 &&
+    state.filters.status === "new" &&
+    !state.filters.search &&
+    !state.filters.year &&
+    !state.filters.program &&
+    !state.filters.division_type
+  );
+}
+
+function renderTableSkeleton(colCount, rowCount = 4) {
+  let rows = "";
+  for (let i = 0; i < rowCount; i++) {
+    let cells = "";
+    for (let c = 0; c < colCount; c++) {
+      const width = c === 0 ? "78%" : c === colCount - 1 ? "56%" : "68%";
+      cells += `<td><span class="skeleton-bar" style="width:${width}"></span></td>`;
+    }
+    rows += `<tr class="skeleton-row">${cells}</tr>`;
+  }
+  return rows;
+}
+
+function setKpiSkeleton(isLoading) {
+  const ids = [
+    "metricTotal",
+    "metricTurnaround",
+    "metricNew",
+    "metricUnderReview",
+    "metricApproved",
+    "metricRevision",
+    "metricDeclined",
+  ];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle("is-skeleton", isLoading);
+    if (isLoading && !state.loaded.dashboard) {
+      el.innerHTML = `<span class="skeleton-kpi-bar"></span>`;
+    }
+  });
+}
 
 // ---------------- Initialization ----------------
 document.addEventListener("DOMContentLoaded", () => {
@@ -87,12 +252,23 @@ function checkAuth() {
     renderUserHeader();
   }
 
+  // Hydrate cached admin views synchronously before switching view (0ms warm boot)
+  const hadWarmCache = restoreAdminCache();
+
   // Restore view from URL hash or previous session
-  const validViews = ["dashboard", "queue", "templates", "settings", "audit"];
+  const validViews = ["dashboard", "queue", "departments", "templates", "settings", "audit"];
   const hash = window.location.hash.replace("#", "").trim();
   const savedView = localStorage.getItem("admin_active_view");
   const initialView = validViews.includes(hash) ? hash : (validViews.includes(savedView) ? savedView : "dashboard");
   switchView(initialView);
+
+  // Preload Dashboard + all other admin pages in background and start POST-mutation watcher
+  preloadAllAdminViews({ force: false });
+  startSyncWatcher();
+  if (hadWarmCache) {
+    // Check immediately if any POST happened while tab was closed/reloaded
+    checkForServerUpdates();
+  }
 
   // Background verification of token with /me (non-blocking)
   fetch(`${API_BASE}/api/v1/admin/me`, { headers: getHeaders() })
@@ -171,6 +347,8 @@ async function loginWithCredentials(email, password) {
 }
 
 function logout() {
+  stopSyncWatcher();
+  clearAdminCache();
   state.token = "";
   state.user = null;
   localStorage.removeItem("admin_token");
@@ -236,34 +414,251 @@ function switchView(viewName) {
 
   if (viewName === "dashboard") loadDashboard();
   else if (viewName === "queue") loadQueue();
+  else if (viewName === "departments") loadDepartments();
   else if (viewName === "templates") loadTemplates();
   else if (viewName === "settings") loadSettings();
   else if (viewName === "audit") loadAuditLogs();
 }
 
+// ---------------- Background Preloader & Mutation Sync Watcher ----------------
+function preloadAllAdminViews({ force = false } = {}) {
+  if (!state.token) return;
+  if (!force && state.preloadStarted) return;
+  state.preloadStarted = true;
+
+  // 1. Ensure Dashboard is always preloaded first (even if user opened another hash tab)
+  if (force || !state.loaded.dashboard) {
+    loadDashboard({ force: true, silent: state.currentView !== "dashboard" });
+  }
+
+  // 2. Capture baseline server sync version
+  if (!state.syncState) {
+    fetch(`${API_BASE}/api/v1/admin/sync-version?_t=${Date.now()}`, {
+      headers: getHeaders(),
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((sync) => {
+        if (sync && typeof sync.version === "number") {
+          state.syncState = sync;
+          saveAdminCache();
+        }
+      })
+      .catch(() => {});
+  }
+
+  // 3. Background preload all remaining admin views into cache without blocking active paint
+  const runBackgroundFetches = () => {
+    if (!state.token) return;
+    if (force || !state.loaded.queue) {
+      loadQueue({ force: true, silent: state.currentView !== "queue", backgroundDefault: true });
+    }
+    if (force || !state.loaded.settings || !state.loaded.departments) {
+      loadSettingsShared({ force: true, silent: state.currentView !== "settings" && state.currentView !== "departments" });
+    }
+    if (force || !state.loaded.templates) {
+      loadTemplates({ force: true, silent: state.currentView !== "templates" });
+    }
+    if (force || !state.loaded.audit) {
+      loadAuditLogs({ force: true, silent: state.currentView !== "audit" });
+    }
+  };
+
+  if (force) {
+    runBackgroundFetches();
+  } else {
+    const bgTimer = setTimeout(runBackgroundFetches, 120);
+    if (bgTimer && typeof bgTimer.unref === "function") bgTimer.unref();
+  }
+}
+
+function refreshScopes(scopes, eventName = "") {
+  if (!state.token || !Array.isArray(scopes) || scopes.length === 0) return;
+  const scopeSet = new Set(scopes);
+
+  if (scopeSet.has("applications") || scopeSet.has("all")) {
+    loadDashboard({ force: true, silent: true });
+    loadQueue({ force: true, silent: true });
+  }
+  if (scopeSet.has("settings") || scopeSet.has("all")) {
+    loadSettingsShared({ force: true, silent: true });
+  }
+  if (scopeSet.has("templates") || scopeSet.has("all")) {
+    loadTemplates({ force: true, silent: true });
+  }
+  if (scopeSet.has("audit") || scopeSet.has("all")) {
+    loadAuditLogs({ force: true, silent: true });
+  }
+
+  if (eventName === "new_registration") {
+    showToast("New membership application received — views updated!", "info");
+  } else if (eventName === "revision_submitted") {
+    showToast("Applicant revision submitted — views updated!", "info");
+  }
+}
+
+function captureCurrentSyncVersion() {
+  if (!state.token) return;
+  fetch(`${API_BASE}/api/v1/admin/sync-version?_t=${Date.now()}`, {
+    headers: getHeaders(),
+    cache: "no-store",
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((sync) => {
+      if (sync && typeof sync.version === "number") {
+        state.syncState = sync;
+        saveAdminCache();
+      }
+    })
+    .catch(() => {});
+}
+
+function checkForServerUpdates() {
+  if (!state.token) return;
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+
+  fetch(`${API_BASE}/api/v1/admin/sync-version?_t=${Date.now()}`, {
+    headers: getHeaders(),
+    cache: "no-store",
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((remote) => {
+      if (!remote || typeof remote.version !== "number") return;
+
+      if (!state.syncState) {
+        state.syncState = remote;
+        saveAdminCache();
+        return;
+      }
+
+      if (remote.version === state.syncState.version) {
+        return; // No POST/PUT mutation happened — stay 100% on cache!
+      }
+
+      const prevScopes = state.syncState.scopes || {};
+      const nextScopes = remote.scopes || {};
+      const changedScopes = [];
+      for (const scope of ["applications", "settings", "templates", "audit"]) {
+        if ((nextScopes[scope] || 0) !== (prevScopes[scope] || 0)) {
+          changedScopes.push(scope);
+        }
+      }
+      state.syncState = remote;
+      saveAdminCache();
+
+      refreshScopes(changedScopes.length > 0 ? changedScopes : ["all"], remote.last_event || "");
+    })
+    .catch(() => {});
+}
+
+function startSyncWatcher() {
+  if (typeof window === "undefined") return;
+
+  if (!state.syncTimer) {
+    state.syncTimer = setInterval(checkForServerUpdates, SYNC_POLL_INTERVAL_MS);
+    if (state.syncTimer && typeof state.syncTimer.unref === "function") {
+      state.syncTimer.unref();
+    }
+  }
+
+  if (!state.syncChannel && typeof BroadcastChannel !== "undefined") {
+    try {
+      state.syncChannel = new BroadcastChannel("awssbg_sync");
+      state.syncChannel.onmessage = (event) => {
+        const msg = event?.data;
+        if (!msg || msg.type !== "mutation") return;
+        const scopes = msg.scope === "applications" ? ["applications", "audit"] : [msg.scope || "all"];
+        refreshScopes(scopes, msg.event || "");
+        captureCurrentSyncVersion();
+      };
+    } catch (_) {}
+  }
+
+  if (!state.syncWatcherAttached) {
+    state.syncWatcherAttached = true;
+    window.addEventListener("focus", checkForServerUpdates);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") checkForServerUpdates();
+    });
+    window.addEventListener("storage", (e) => {
+      if (e.key === "awssbg_last_post_event" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const scopes = parsed.scope === "applications" ? ["applications", "audit"] : [parsed.scope || "all"];
+          refreshScopes(scopes, parsed.event || "");
+          captureCurrentSyncVersion();
+        } catch (_) {}
+      }
+    });
+  }
+}
+
+function stopSyncWatcher() {
+  if (state.syncTimer) {
+    clearInterval(state.syncTimer);
+    state.syncTimer = null;
+  }
+  if (state.syncChannel) {
+    try {
+      state.syncChannel.close();
+    } catch (_) {}
+    state.syncChannel = null;
+  }
+}
+
 // ---------------- Dashboard ----------------
-function loadDashboard() {
+function loadDashboard({ force = false, silent = false } = {}) {
+  // Cache-first: render cached Dashboard immediately with 0 network calls unless forced
+  if (!force && state.loaded.dashboard && state.metrics) {
+    setKpiSkeleton(false);
+    updateKpiElements(state.metrics);
+    renderRecentQueue(state.recentApplications || []);
+    return;
+  }
+
+  if (!state.loaded.dashboard && !silent) {
+    setKpiSkeleton(true);
+    const recentBody = document.getElementById("recentQueueBody");
+    if (recentBody) recentBody.innerHTML = renderTableSkeleton(5, 3);
+  }
+
+  const metricsReqId = ++state.reqSeq.dashboardMetrics;
   fetch(`${API_BASE}/api/v1/admin/metrics`, { headers: getHeaders() })
     .then((res) => {
       if (!res.ok) throw new Error("Metrics response not ok");
       return res.json();
     })
     .then((data) => {
+      if (metricsReqId !== state.reqSeq.dashboardMetrics) return;
+      state.metrics = data;
+      state.loaded.dashboard = true;
+      setKpiSkeleton(false);
       updateKpiElements(data);
+      saveAdminCache();
     })
-    .catch((err) => console.warn("Metrics load notice:", err));
+    .catch((err) => {
+      if (metricsReqId !== state.reqSeq.dashboardMetrics) return;
+      setKpiSkeleton(false);
+      console.warn("Metrics load notice:", err);
+    });
 
   // Quick queue list in dashboard
+  const queueReqId = ++state.reqSeq.dashboardQueue;
   fetch(`${API_BASE}/api/v1/admin/applications?page_size=5&status=new`, { headers: getHeaders() })
     .then((res) => {
       if (!res.ok) throw new Error("Recent queue response not ok");
       return res.json();
     })
     .then((data) => {
+      if (queueReqId !== state.reqSeq.dashboardQueue) return;
       state.recentApplications = data.applications || [];
       renderRecentQueue(state.recentApplications);
+      saveAdminCache();
     })
-    .catch((err) => console.warn("Recent queue load notice:", err));
+    .catch((err) => {
+      if (queueReqId !== state.reqSeq.dashboardQueue) return;
+      console.warn("Recent queue load notice:", err);
+    });
 }
 
 function updateKpiElements(data) {
@@ -329,7 +724,7 @@ function initFilters() {
       debounceTimeout = setTimeout(() => {
         state.filters.search = searchInput.value.trim();
         state.page = 1;
-        loadQueue();
+        loadQueue({ force: true });
       }, 300);
     });
   }
@@ -342,7 +737,7 @@ function initFilters() {
         if (id === "filterProgram") state.filters.program = el.value;
         if (id === "filterDivision") state.filters.division_type = el.value;
         state.page = 1;
-        loadQueue();
+        loadQueue({ force: true });
       });
     }
   });
@@ -354,7 +749,7 @@ function initFilters() {
       btn.classList.add("active");
       state.filters.status = btn.dataset.status;
       state.page = 1;
-      loadQueue();
+      loadQueue({ force: true });
     });
   });
 
@@ -364,7 +759,7 @@ function initFilters() {
     prevBtn.addEventListener("click", () => {
       if (state.page > 1) {
         state.page--;
-        loadQueue();
+        loadQueue({ force: true });
       }
     });
   }
@@ -372,37 +767,96 @@ function initFilters() {
     nextBtn.addEventListener("click", () => {
       if (state.page * state.pageSize < state.total) {
         state.page++;
-        loadQueue();
+        loadQueue({ force: true });
       }
     });
   }
 }
 
-function loadQueue() {
+function loadQueue({ force = false, silent = false, backgroundDefault = false } = {}) {
+  const defaultView = backgroundDefault || isDefaultQueueView();
+
+  // Cache-first for default unfiltered queue view when switching tabs
+  if (!force && defaultView && state.loaded.queue && state.defaultQueueCache) {
+    state.applications = state.defaultQueueCache.applications || [];
+    state.total = state.defaultQueueCache.total || 0;
+    state.statusCounts = state.defaultQueueCache.statusCounts || {};
+    updateStatusCounters();
+    renderQueueTable();
+    updatePaginationControls();
+    return;
+  }
+
+  if (state.queueAbortController && !backgroundDefault) {
+    state.queueAbortController.abort();
+  }
+  const controller = new AbortController();
+  if (!backgroundDefault) state.queueAbortController = controller;
+  const reqId = ++state.reqSeq.queue;
+
+  const tbody = document.getElementById("queueTableBody");
+  if (tbody && !silent) {
+    if (!state.loaded.queue) {
+      tbody.innerHTML = renderTableSkeleton(7, 5);
+    } else {
+      tbody.classList.add("is-refreshing");
+    }
+  }
+
   const params = new URLSearchParams({
-    page: state.page,
+    page: backgroundDefault ? 1 : state.page,
     page_size: state.pageSize,
   });
 
-  if (state.filters.status && state.filters.status !== "all") params.append("status", state.filters.status);
-  if (state.filters.search) params.append("search", state.filters.search);
-  if (state.filters.year) params.append("year", state.filters.year);
-  if (state.filters.program) params.append("program", state.filters.program);
-  if (state.filters.division_type) params.append("division_type", state.filters.division_type);
+  if (backgroundDefault) {
+    params.append("status", "new");
+  } else {
+    if (state.filters.status && state.filters.status !== "all") params.append("status", state.filters.status);
+    if (state.filters.search) params.append("search", state.filters.search);
+    if (state.filters.year) params.append("year", state.filters.year);
+    if (state.filters.program) params.append("program", state.filters.program);
+    if (state.filters.division_type) params.append("division_type", state.filters.division_type);
+  }
 
-  fetch(`${API_BASE}/api/v1/admin/applications?${params.toString()}`, { headers: getHeaders() })
-    .then((res) => res.json())
+  fetch(`${API_BASE}/api/v1/admin/applications?${params.toString()}`, {
+    headers: getHeaders(),
+    signal: controller.signal,
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to load queue applications");
+      return res.json();
+    })
     .then((data) => {
-      state.applications = data.applications || [];
-      state.total = data.total || 0;
-      state.statusCounts = data.status_counts || {};
-      updateStatusCounters();
-      renderQueueTable();
-      updatePaginationControls();
+      if (!backgroundDefault && reqId !== state.reqSeq.queue) return;
+      state.loaded.queue = true;
+      const apps = data.applications || [];
+      const total = data.total || 0;
+      const counts = data.status_counts || {};
+
+      if (defaultView) {
+        state.defaultQueueCache = { applications: apps, total, statusCounts: counts };
+      }
+
+      if (!backgroundDefault || isDefaultQueueView()) {
+        state.applications = apps;
+        state.total = total;
+        state.statusCounts = counts;
+        updateStatusCounters();
+        renderQueueTable();
+        updatePaginationControls();
+      }
+      saveAdminCache();
     })
     .catch((err) => {
+      if (err && err.name === "AbortError") return;
+      if (!backgroundDefault && reqId !== state.reqSeq.queue) return;
       console.error("Queue load failed:", err);
-      showToast("Failed to load queue applications", "error");
+      if (!silent) showToast("Failed to load queue applications", "error");
+    })
+    .finally(() => {
+      if (reqId === state.reqSeq.queue && tbody) {
+        tbody.classList.remove("is-refreshing");
+      }
     });
 }
 
@@ -474,31 +928,51 @@ function updatePaginationControls() {
 
 // ---------------- Review Workspace Modal ----------------
 window.openReviewModal = function (appId) {
+  const reqId = ++state.reqSeq.modal;
+
+  // Instantly open modal with cached summary from queue/dashboard so clicks feel immediate
+  const previewSummary =
+    state.applications.find((a) => a.id === appId) ||
+    state.recentApplications.find((a) => a.id === appId);
+
+  const overlay = document.getElementById("reviewModalOverlay");
+  if (previewSummary) {
+    state.activeApp = { ...previewSummary, reviews: [], email_logs: [] };
+    renderReviewModal(state.activeApp, true);
+    if (overlay) overlay.classList.add("active");
+  }
+
   fetch(`${API_BASE}/api/v1/admin/applications/${appId}`, { headers: getHeaders() })
-    .then((res) => res.json())
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to load application detail");
+      return res.json();
+    })
     .then((app) => {
+      if (reqId !== state.reqSeq.modal) return;
       state.activeApp = app;
-      renderReviewModal(app);
-      document.getElementById("reviewModalOverlay").classList.add("active");
+      renderReviewModal(app, false);
+      if (overlay) overlay.classList.add("active");
     })
     .catch((err) => {
+      if (reqId !== state.reqSeq.modal) return;
       showToast(err.message || "Failed to load application detail", "error");
     });
 };
 
 function closeReviewModal() {
+  state.reqSeq.modal++;
   document.getElementById("reviewModalOverlay").classList.remove("active");
   state.activeApp = null;
 }
 
-function renderReviewModal(app) {
+function renderReviewModal(app, isPreviewLoading = false) {
   document.getElementById("modalApplicantName").textContent = app.full_name;
   document.getElementById("modalStudentId").textContent = app.student_id;
   document.getElementById("modalEmail").textContent = app.email;
   document.getElementById("modalProgram").textContent = `${app.program} — ${app.year}`;
-  document.getElementById("modalDob").textContent = app.dob || "Not provided";
-  document.getElementById("modalDivision").textContent = `${app.division_name} (${app.division_type.toUpperCase()})`;
-  document.getElementById("modalStatusBadge").innerHTML = `<span class="badge badge-${escapeHtml(app.application_status)}">${escapeHtml(app.application_status.replace("_", " "))}</span>`;
+  document.getElementById("modalDob").textContent = app.dob || (isPreviewLoading ? "Loading..." : "Not provided");
+  document.getElementById("modalDivision").textContent = `${app.division_name} (${(app.division_type || "").toUpperCase()})`;
+  document.getElementById("modalStatusBadge").innerHTML = `<span class="badge badge-${escapeHtml(app.application_status)}">${escapeHtml((app.application_status || "new").replace("_", " "))}</span>`;
 
   // Photo
   const photoEl = document.getElementById("modalPhotoPreview");
@@ -510,7 +984,14 @@ function renderReviewModal(app) {
   }
 
   // Explanation
-  document.getElementById("modalExplanation").textContent = app.explanation || "No statement provided.";
+  const explanationEl = document.getElementById("modalExplanation");
+  if (explanationEl) {
+    if (isPreviewLoading && !app.explanation) {
+      explanationEl.innerHTML = `<span class="skeleton-bar" style="width:94%"></span><span class="skeleton-bar" style="width:82%;margin-top:8px"></span><span class="skeleton-bar" style="width:65%;margin-top:8px"></span>`;
+    } else {
+      explanationEl.textContent = app.explanation || "No statement provided.";
+    }
+  }
 
   // Claim button state
   renderClaimButton(app);
@@ -519,7 +1000,14 @@ function renderReviewModal(app) {
   loadAndRenderRubric();
 
   // Notes Thread
-  renderNotesThread(app.reviews || []);
+  if (isPreviewLoading) {
+    const notesEl = document.getElementById("notesThread");
+    if (notesEl) {
+      notesEl.innerHTML = `<span class="skeleton-bar" style="width:70%;margin:0.5rem 0"></span>`;
+    }
+  } else {
+    renderNotesThread(app.reviews || []);
+  }
 }
 
 function renderClaimButton(app) {
@@ -599,26 +1087,36 @@ function releaseCurrentApp() {
     });
 }
 
+function renderRubricItems(rubricContainer, items) {
+  rubricContainer.innerHTML = items
+    .map(
+      (item) => `
+    <label class="rubric-item">
+      <input type="checkbox" id="rubric_${escapeHtml(item.id)}" />
+      <span class="rubric-label">${escapeHtml(item.label)}</span>
+    </label>
+  `
+    )
+    .join("");
+}
+
 function loadAndRenderRubric() {
   const rubricContainer = document.getElementById("rubricContainer");
   if (!rubricContainer) return;
 
-  // Fetch settings rubric
+  if (state.rubricItems && state.rubricItems.length > 0) {
+    renderRubricItems(rubricContainer, state.rubricItems);
+    return;
+  }
+
+  // Fetch settings rubric once and cache in memory
   fetch(`${API_BASE}/api/v1/admin/settings`, { headers: getHeaders() })
     .then((res) => res.json())
     .then((settings) => {
+      state.settings = settings;
       const items = settings.qualification_rubric || [];
       state.rubricItems = items;
-      rubricContainer.innerHTML = items
-        .map(
-          (item) => `
-        <label class="rubric-item">
-          <input type="checkbox" id="rubric_${escapeHtml(item.id)}" />
-          <span class="rubric-label">${escapeHtml(item.label)}</span>
-        </label>
-      `
-        )
-        .join("");
+      renderRubricItems(rubricContainer, items);
     })
     .catch(() => {
       rubricContainer.innerHTML = `<p class="decision-hint">Standard JRU Enrollment & Authentic Interest checks</p>`;
@@ -742,7 +1240,10 @@ function preloadQrAssets() {
     loadQrDataUrl(url).catch(() => {});
   });
 }
-preloadQrAssets();
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  const preloadTimer = setTimeout(preloadQrAssets, 2000);
+  if (preloadTimer && typeof preloadTimer.unref === "function") preloadTimer.unref();
+}
 
 window.initiateDecision = async function (decisionType) {
   if (!state.activeApp) return;
@@ -1328,55 +1829,51 @@ function submitDecisionPayload(payload) {
     .catch((err) => {
       showToast(`Error saving decision: ${err.message}`, "error");
       // Revert / re-fetch on failure
-      loadQueue();
-      loadDashboard();
+      loadQueue({ force: true });
+      loadDashboard({ force: true });
     });
 }
 
 function silentSync() {
-  // Always keep dashboard metrics updated in background
-  fetch(`${API_BASE}/api/v1/admin/metrics`, { headers: getHeaders() })
-    .then((res) => res.json())
-    .then((data) => updateKpiElements(data))
-    .catch(() => {});
-
-  if (state.currentView === "queue") {
-    const params = new URLSearchParams({
-      page: state.page,
-      page_size: state.pageSize,
-    });
-    if (state.filters.status && state.filters.status !== "all") params.append("status", state.filters.status);
-    if (state.filters.search) params.append("search", state.filters.search);
-    if (state.filters.year) params.append("year", state.filters.year);
-    if (state.filters.program) params.append("program", state.filters.program);
-    if (state.filters.division_type) params.append("division_type", state.filters.division_type);
-
-    fetch(`${API_BASE}/api/v1/admin/applications?${params.toString()}`, { headers: getHeaders() })
-      .then((res) => res.json())
-      .then((data) => {
-        state.applications = data.applications || [];
-        state.total = data.total || 0;
-        state.statusCounts = data.status_counts || {};
-        updateStatusCounters();
-        renderQueueTable();
-        updatePaginationControls();
-      })
-      .catch(() => {});
-  } else if (state.currentView === "dashboard") {
-    loadDashboard();
-  }
+  loadDashboard({ force: true, silent: true });
+  loadQueue({ force: true, silent: true });
+  loadAuditLogs({ force: true, silent: true });
+  captureCurrentSyncVersion();
 }
 
 // ---------------- Email Templates Editor ----------------
-function loadTemplates() {
+function loadTemplates({ force = false, silent = false } = {}) {
+  const activeId = document.getElementById("tmplEditId")?.value || "";
+
+  if (!force && state.loaded.templates && state.templates.length > 0) {
+    renderTemplateTabs(state.templates);
+    const keepId = activeId && state.templates.some((t) => t.id === activeId) ? activeId : state.templates[0].id;
+    selectTemplate(keepId);
+    return;
+  }
+
+  const reqId = ++state.reqSeq.templates;
   fetch(`${API_BASE}/api/v1/admin/templates`, { headers: getHeaders() })
     .then((res) => res.json())
     .then((templates) => {
-      state.templates = templates;
-      renderTemplateTabs(templates);
-      if (templates.length > 0) selectTemplate(templates[0].id);
+      if (reqId !== state.reqSeq.templates) return;
+      state.loaded.templates = true;
+      state.templates = Array.isArray(templates) ? templates : [];
+      renderTemplateTabs(state.templates);
+      if (state.templates.length > 0) {
+        const currentEditId = document.getElementById("tmplEditId")?.value || "";
+        const targetId =
+          currentEditId && state.templates.some((t) => t.id === currentEditId)
+            ? currentEditId
+            : state.templates[0].id;
+        selectTemplate(targetId);
+      }
+      saveAdminCache();
     })
-    .catch((err) => showToast(err.message, "error"));
+    .catch((err) => {
+      if (reqId !== state.reqSeq.templates) return;
+      if (!silent) showToast(err.message, "error");
+    });
 }
 
 function renderTemplateTabs(templates) {
@@ -1439,23 +1936,315 @@ window.saveTemplateChanges = function () {
     })
     .then(() => {
       showToast("Template updated successfully!", "success");
-      loadTemplates();
+      loadTemplates({ force: true });
+      loadAuditLogs({ force: true, silent: true });
+      captureCurrentSyncVersion();
     })
     .catch((err) => showToast(err.message, "error"));
 };
 
-// ---------------- Settings & Availability ----------------
-function loadSettings() {
+// ---------------- Departments & Settings ----------------
+const DEFAULT_DIVISION_AVAILABILITY = {
+  office: {
+    Relations: "open",
+    Operations: "open",
+    Creatives: "open",
+    Marketing: "full",
+    Media: "full",
+  },
+  skillbuilder: {
+    "Software Development": "open",
+    "Web Development": "full",
+    "UI/UX": "open",
+    "Data Analyst": "full",
+    "Cloud Computing": "full",
+    "Machine Learning & AI": "full",
+  },
+};
+
+const DIVISION_ELIGIBILITY_HINTS = {
+  office: {
+    Relations: "1st Year Only",
+    Creatives: "1st & 2nd Year",
+  },
+  skillbuilder: {},
+};
+
+state.savedDivisionAvailability = mergeDivisionAvailability();
+state.draftDivisionAvailability = mergeDivisionAvailability();
+
+function mergeDivisionAvailability(raw) {
+  const merged = {
+    office: { ...DEFAULT_DIVISION_AVAILABILITY.office },
+    skillbuilder: { ...DEFAULT_DIVISION_AVAILABILITY.skillbuilder },
+  };
+  if (!raw || typeof raw !== "object") return merged;
+  for (const dept of ["office", "skillbuilder"]) {
+    const incoming = raw[dept];
+    if (!incoming || typeof incoming !== "object") continue;
+    for (const name of Object.keys(merged[dept])) {
+      if (incoming[name] === "open" || incoming[name] === "full") {
+        merged[dept][name] = incoming[name];
+      }
+    }
+  }
+  return merged;
+}
+
+function isDepartmentDraftDirty() {
+  for (const dept of ["office", "skillbuilder"]) {
+    const saved = state.savedDivisionAvailability[dept] || {};
+    const draft = state.draftDivisionAvailability[dept] || {};
+    for (const name of Object.keys(DEFAULT_DIVISION_AVAILABILITY[dept])) {
+      if (saved[name] !== draft[name]) return true;
+    }
+  }
+  return false;
+}
+
+function syncDepartmentSummaryUI() {
+  const draft = state.draftDivisionAvailability;
+  const officeVals = Object.values(draft.office);
+  const sbVals = Object.values(draft.skillbuilder);
+
+  const officeOpen = officeVals.filter((s) => s === "open").length;
+  const sbOpen = sbVals.filter((s) => s === "open").length;
+  const totalCount = officeVals.length + sbVals.length;
+  const totalOpen = officeOpen + sbOpen;
+  const totalFull = totalCount - totalOpen;
+
+  const kpiTotal = document.getElementById("deptKpiTotal");
+  const kpiOpen = document.getElementById("deptKpiOpen");
+  const kpiFull = document.getElementById("deptKpiFull");
+  if (kpiTotal) kpiTotal.textContent = String(totalCount);
+  if (kpiOpen) kpiOpen.textContent = String(totalOpen);
+  if (kpiFull) kpiFull.textContent = String(totalFull);
+
+  const officeCountEl = document.getElementById("officeOpenCount");
+  const sbCountEl = document.getElementById("skillbuilderOpenCount");
+  if (officeCountEl) officeCountEl.textContent = `${officeOpen} of ${officeVals.length} divisions open`;
+  if (sbCountEl) sbCountEl.textContent = `${sbOpen} of ${sbVals.length} divisions open`;
+
+  const officeBar = document.getElementById("officeProgressFill");
+  const sbBar = document.getElementById("skillbuilderProgressFill");
+  if (officeBar) officeBar.style.width = `${Math.round((officeOpen / officeVals.length) * 100)}%`;
+  if (sbBar) sbBar.style.width = `${Math.round((sbOpen / sbVals.length) * 100)}%`;
+
+  const dirty = isDepartmentDraftDirty();
+  const dirtyEl = document.getElementById("deptDirtyIndicator");
+  const resetBtn = document.getElementById("btnResetDepartments");
+  const saveBtn = document.getElementById("btnSaveDepartments");
+  if (dirtyEl) dirtyEl.hidden = !dirty;
+  if (resetBtn) resetBtn.hidden = !dirty;
+  if (saveBtn) saveBtn.disabled = !dirty;
+}
+
+function renderDivisionAvailabilitySettings(availability) {
+  const merged = mergeDivisionAvailability(availability);
+  state.draftDivisionAvailability = merged;
+
+  const groups = [
+    { key: "office", containerId: "divisionSettingsOffice" },
+    { key: "skillbuilder", containerId: "divisionSettingsSkillbuilder" },
+  ];
+
+  groups.forEach(({ key, containerId }) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const divisions = merged[key];
+    container.innerHTML = Object.entries(divisions)
+      .map(([name, status]) => {
+        const isOpen = status === "open";
+        const hint = DIVISION_ELIGIBILITY_HINTS[key]?.[name] || "";
+        const hintHtml = hint ? `<span class="dept-eligibility-tag">${escapeHtml(hint)}</span>` : "";
+        const safeDept = escapeHtml(key);
+        const safeName = escapeHtml(name);
+        return `
+          <div class="dept-row ${isOpen ? "is-open" : "is-full"}">
+            <div class="dept-row-info">
+              <span class="dept-row-dot" aria-hidden="true"></span>
+              <div class="dept-row-text">
+                <span class="dept-row-name">${safeName}</span>
+                ${hintHtml}
+              </div>
+            </div>
+            <div class="dept-segment" role="group" aria-label="${safeName} status">
+              <button
+                type="button"
+                class="dept-seg-btn dept-seg-open ${isOpen ? "active" : ""}"
+                data-dept="${safeDept}"
+                data-division="${safeName}"
+                data-status="open"
+                aria-pressed="${isOpen ? "true" : "false"}"
+                onclick="setDivisionStatus(this)"
+              >Open</button>
+              <button
+                type="button"
+                class="dept-seg-btn dept-seg-full ${!isOpen ? "active" : ""}"
+                data-dept="${safeDept}"
+                data-division="${safeName}"
+                data-status="full"
+                aria-pressed="${!isOpen ? "true" : "false"}"
+                onclick="setDivisionStatus(this)"
+              >Full</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  });
+
+  syncDepartmentSummaryUI();
+}
+
+window.setDivisionStatus = function (btn) {
+  const deptKey = btn.dataset.dept;
+  const divisionName = btn.dataset.division;
+  const nextStatus = btn.dataset.status;
+  if (!deptKey || !divisionName || (nextStatus !== "open" && nextStatus !== "full")) return;
+
+  state.draftDivisionAvailability[deptKey][divisionName] = nextStatus;
+
+  const row = btn.closest(".dept-row");
+  if (row) {
+    const isOpen = nextStatus === "open";
+    row.classList.toggle("is-open", isOpen);
+    row.classList.toggle("is-full", !isOpen);
+    row.querySelectorAll(".dept-seg-btn").forEach((seg) => {
+      const active = seg.dataset.status === nextStatus;
+      seg.classList.toggle("active", active);
+      seg.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  syncDepartmentSummaryUI();
+};
+
+window.toggleDepartmentGroup = function (deptKey, targetStatus) {
+  if (!state.draftDivisionAvailability[deptKey]) return;
+  for (const name of Object.keys(state.draftDivisionAvailability[deptKey])) {
+    state.draftDivisionAvailability[deptKey][name] = targetStatus;
+  }
+  renderDivisionAvailabilitySettings(state.draftDivisionAvailability);
+};
+
+window.resetDepartmentChanges = function () {
+  renderDivisionAvailabilitySettings(state.savedDivisionAvailability);
+};
+
+function applySettingsToUI(settings) {
+  state.settings = settings;
+  if (settings.qualification_rubric) state.rubricItems = settings.qualification_rubric;
+  const toggle = document.getElementById("settingRegistrationOpen");
+  const msg = document.getElementById("settingClosedMessage");
+  if (toggle) toggle.checked = settings.registration_open;
+  if (msg) msg.value = settings.closed_message || "";
+
+  const wasDirty = state.loaded.departments && isDepartmentDraftDirty();
+  state.savedDivisionAvailability = mergeDivisionAvailability(settings.division_availability);
+  try {
+    localStorage.setItem("awssbg_division_availability_v1", JSON.stringify(state.savedDivisionAvailability));
+  } catch (_) {}
+  if (!wasDirty) {
+    renderDivisionAvailabilitySettings(state.savedDivisionAvailability);
+  } else {
+    syncDepartmentSummaryUI();
+  }
+}
+
+function loadSettingsShared({ force = false, silent = false } = {}) {
+  if (!force && state.loaded.settings && state.loaded.departments && state.settings) {
+    applySettingsToUI(state.settings);
+    return;
+  }
+
+  const reqId = ++state.reqSeq.settings;
   fetch(`${API_BASE}/api/v1/admin/settings`, { headers: getHeaders() })
     .then((res) => res.json())
     .then((settings) => {
-      state.settings = settings;
-      const toggle = document.getElementById("settingRegistrationOpen");
-      const msg = document.getElementById("settingClosedMessage");
-      if (toggle) toggle.checked = settings.registration_open;
-      if (msg) msg.value = settings.closed_message || "";
+      if (reqId !== state.reqSeq.settings) return;
+      state.loaded.settings = true;
+      state.loaded.departments = true;
+      applySettingsToUI(settings);
+      saveAdminCache();
     })
-    .catch((err) => showToast(err.message, "error"));
+    .catch((err) => {
+      if (reqId !== state.reqSeq.settings) return;
+      if (!silent) showToast(err.message || "Failed to load settings", "error");
+    });
+}
+
+function loadDepartments({ force = false, silent = false } = {}) {
+  if (!force && state.loaded.departments) {
+    if (!isDepartmentDraftDirty()) {
+      renderDivisionAvailabilitySettings(state.savedDivisionAvailability);
+    }
+    return;
+  }
+
+  // Paint local snapshot immediately if available while fetching once
+  try {
+    const cachedRaw = localStorage.getItem("awssbg_division_availability_v1");
+    if (cachedRaw) {
+      state.savedDivisionAvailability = mergeDivisionAvailability(JSON.parse(cachedRaw));
+    }
+  } catch (_) {}
+  renderDivisionAvailabilitySettings(state.savedDivisionAvailability);
+
+  loadSettingsShared({ force: true, silent });
+}
+
+window.saveDepartmentAvailability = function () {
+  const saveBtn = document.getElementById("btnSaveDepartments");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+  }
+
+  fetch(`${API_BASE}/api/v1/admin/settings`, {
+    method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify({
+      division_availability: state.draftDivisionAvailability,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Department update failed (Admin only)");
+      return res.json();
+    })
+    .then((updated) => {
+      state.loaded.settings = true;
+      state.loaded.departments = true;
+      state.settings = updated;
+      state.savedDivisionAvailability = mergeDivisionAvailability(updated.division_availability);
+      try {
+        localStorage.setItem("awssbg_division_availability_v1", JSON.stringify(state.savedDivisionAvailability));
+      } catch (_) {}
+      renderDivisionAvailabilitySettings(state.savedDivisionAvailability);
+      saveAdminCache();
+      loadAuditLogs({ force: true, silent: true });
+      captureCurrentSyncVersion();
+      showToast("Department availability updated!", "success");
+    })
+    .catch((err) => {
+      showToast(err.message, "error");
+      syncDepartmentSummaryUI();
+    })
+    .finally(() => {
+      if (saveBtn) saveBtn.textContent = "Save Changes";
+    });
+};
+
+function loadSettings({ force = false, silent = false } = {}) {
+  if (!force && state.loaded.settings && state.settings) {
+    const toggle = document.getElementById("settingRegistrationOpen");
+    const msg = document.getElementById("settingClosedMessage");
+    if (toggle) toggle.checked = state.settings.registration_open;
+    if (msg) msg.value = state.settings.closed_message || "";
+    return;
+  }
+  loadSettingsShared({ force: true, silent });
 }
 
 window.saveSettings = function () {
@@ -1465,13 +2254,21 @@ window.saveSettings = function () {
   fetch(`${API_BASE}/api/v1/admin/settings`, {
     method: "PUT",
     headers: getHeaders(),
-    body: JSON.stringify({ registration_open: isOpen, closed_message: msg }),
+    body: JSON.stringify({
+      registration_open: isOpen,
+      closed_message: msg,
+    }),
   })
     .then((res) => {
       if (!res.ok) throw new Error("Settings update failed (Admin only)");
       return res.json();
     })
-    .then(() => {
+    .then((updated) => {
+      state.loaded.settings = true;
+      state.settings = updated;
+      saveAdminCache();
+      loadAuditLogs({ force: true, silent: true });
+      captureCurrentSyncVersion();
       showToast("System settings saved!", "success");
     })
     .catch((err) => showToast(err.message, "error"));
@@ -1482,32 +2279,64 @@ window.exportCsv = function () {
 };
 
 // ---------------- Audit Logs ----------------
-function loadAuditLogs() {
+function renderAuditLogsTable(logs) {
+  const tbody = document.getElementById("auditLogTableBody");
+  if (!tbody) return;
+  if (logs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state-cell">No audit logs recorded yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = logs
+    .map((l) => {
+      const time = new Date(l.created_at).toLocaleString();
+      return `
+      <tr>
+        <td class="mono-cell">${escapeHtml(time)}</td>
+        <td><strong>${escapeHtml(l.actor_name)}</strong></td>
+        <td><span class="badge badge-new">${escapeHtml(l.action)}</span></td>
+        <td>${escapeHtml(l.target_type)} ${l.target_id ? `(#${escapeHtml(l.target_id)})` : ""}</td>
+        <td class="muted-cell">${escapeHtml(JSON.stringify(l.details || {}))}</td>
+      </tr>
+    `;
+    })
+    .join("");
+}
+
+function loadAuditLogs({ force = false, silent = false } = {}) {
+  const tbody = document.getElementById("auditLogTableBody");
+
+  if (!force && state.loaded.audit) {
+    renderAuditLogsTable(state.auditLogs);
+    return;
+  }
+
+  const reqId = ++state.reqSeq.audit;
+  if (tbody && !silent) {
+    if (!state.loaded.audit) {
+      tbody.innerHTML = renderTableSkeleton(5, 5);
+    } else {
+      tbody.classList.add("is-refreshing");
+    }
+  }
+
   fetch(`${API_BASE}/api/v1/admin/audit-logs`, { headers: getHeaders() })
     .then((res) => res.json())
     .then((logs) => {
-      const tbody = document.getElementById("auditLogTableBody");
-      if (!tbody) return;
-      if (logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-state-cell">No audit logs recorded yet.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = logs
-        .map((l) => {
-          const time = new Date(l.created_at).toLocaleString();
-          return `
-          <tr>
-            <td class="mono-cell">${escapeHtml(time)}</td>
-            <td><strong>${escapeHtml(l.actor_name)}</strong></td>
-            <td><span class="badge badge-new">${escapeHtml(l.action)}</span></td>
-            <td>${escapeHtml(l.target_type)} ${l.target_id ? `(#${escapeHtml(l.target_id)})` : ""}</td>
-            <td class="muted-cell">${escapeHtml(JSON.stringify(l.details || {}))}</td>
-          </tr>
-        `;
-        })
-        .join("");
+      if (reqId !== state.reqSeq.audit) return;
+      state.loaded.audit = true;
+      state.auditLogs = Array.isArray(logs) ? logs : [];
+      renderAuditLogsTable(state.auditLogs);
+      saveAdminCache();
     })
-    .catch((err) => showToast(err.message, "error"));
+    .catch((err) => {
+      if (reqId !== state.reqSeq.audit) return;
+      if (!silent) showToast(err.message, "error");
+    })
+    .finally(() => {
+      if (reqId === state.reqSeq.audit && tbody) {
+        tbody.classList.remove("is-refreshing");
+      }
+    });
 }
 
 // ---------------- Utility ----------------
