@@ -246,6 +246,124 @@ class TestAdminServices(unittest.TestCase):
         self.assertGreater(after_settings["scopes"]["settings"], after_reg["scopes"]["settings"])
         self.assertEqual(after_settings["scopes"]["applications"], after_reg["scopes"]["applications"])
 
+    def test_extract_resume_text_handles_docx_image_and_missing(self):
+        import base64
+        import io
+        import zipfile
+        from backend.services.ai_evaluation_service import extract_resume_text
+
+        # Missing CV
+        text_none, status_none = extract_resume_text(None, None)
+        self.assertEqual(text_none, "")
+        self.assertEqual(status_none, "no_cv")
+
+        # Image CV
+        img_data = "data:image/png;base64," + base64.b64encode(b"\x89PNG\r\n").decode()
+        text_img, status_img = extract_resume_text(img_data, "resume.png")
+        self.assertEqual(text_img, "")
+        self.assertEqual(status_img, "image_only")
+
+        # Valid in-memory DOCX
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "word/document.xml",
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                "<w:body><w:p><w:r><w:t>Built AWS Lambda and React portfolio apps</w:t></w:r></w:p></w:body>"
+                "</w:document>",
+            )
+        docx_b64 = "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64," + base64.b64encode(
+            buf.getvalue()
+        ).decode()
+        text_docx, status_docx = extract_resume_text(docx_b64, "student_cv.docx")
+        self.assertEqual(status_docx, "analyzed_docx")
+        self.assertIn("AWS Lambda", text_docx)
+
+    def test_evaluate_application_with_ai_parses_structured_ats_response(self):
+        import json
+        from unittest.mock import MagicMock, patch
+        from backend.services.ai_evaluation_service import evaluate_application_with_ai
+
+        fake_llm_json = json.dumps({
+            "fit_score": 86,
+            "fit_label": "Strong Fit",
+            "sub_scores": {
+                "division_relevance": 90,
+                "statement_quality": 82,
+                "cv_signal": 85,
+            },
+            "recommendation": "approve",
+            "extracted_skills": ["Figma", "React", "UI Prototyping"],
+            "summary": "Strong portfolio alignment with UI/UX Skill Builder track.",
+            "strengths": ["Hands-on Figma experience", "Clear motivation for cloud UI"],
+            "concerns": ["No prior club leadership listed"],
+            "rubric_hints": {
+                "genuine_interest": True,
+                "quality_submission": True,
+            },
+        })
+
+        mock_resp = MagicMock()
+        mock_resp.choices = [MagicMock(message=MagicMock(content=fake_llm_json))]
+        mock_groq = MagicMock()
+        mock_groq.chat.completions.create.return_value = mock_resp
+
+        app_record = {
+            "full_name": "Juan Dela Cruz",
+            "year": "Second Year",
+            "program": "BS Information Technology",
+            "division_type": "skillbuilder",
+            "division_name": "UI/UX",
+            "explanation": "I love designing accessible web apps in Figma and want to learn AWS.",
+            "resume_base64": None,
+            "resume_filename": None,
+        }
+
+        with (
+            patch("backend.services.ai_evaluation_service.GROQ_API_KEY", "test-key"),
+            patch("backend.services.ai_evaluation_service._get_groq_client", return_value=mock_groq),
+        ):
+            result = evaluate_application_with_ai(app_record)
+            self.assertEqual(result["fit_score"], 86)
+            self.assertEqual(result["recommendation"], "approve")
+            self.assertEqual(result["cv_status"], "no_cv")
+            self.assertIn("Figma", result["extracted_skills"])
+            self.assertEqual(result["sub_scores"]["division_relevance"], 90)
+
+    def test_run_ai_evaluation_uses_cached_result_without_consuming_tokens(self):
+        from unittest.mock import MagicMock, patch
+        from backend.services.application_service import run_ai_evaluation
+
+        cached_eval = {
+            "fit_score": 79,
+            "fit_label": "Strong Fit",
+            "recommendation": "approve",
+            "summary": "Already evaluated.",
+            "strengths": ["Clear goal"],
+            "concerns": [],
+            "extracted_skills": ["Python"],
+            "sub_scores": {"division_relevance": 80, "statement_quality": 78, "cv_signal": 75},
+            "cv_status": "analyzed_pdf",
+        }
+        mock_client = MagicMock()
+        mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+            {
+                "id": 42,
+                "full_name": "Cached Student",
+                "ai_evaluation": cached_eval,
+                "ai_evaluated_at": "2026-11-19T07:00:00+00:00",
+            }
+        ]
+
+        with (
+            patch("backend.services.application_service.get_supabase_admin", return_value=mock_client),
+            patch("backend.services.application_service.evaluate_application_with_ai") as mock_eval,
+        ):
+            res = run_ai_evaluation(42, "officer-1", "Officer", force_refresh=False)
+            self.assertTrue(res["cached"])
+            self.assertEqual(res["evaluation"]["fit_score"], 79)
+            mock_eval.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

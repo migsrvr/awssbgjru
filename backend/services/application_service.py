@@ -8,6 +8,11 @@ from fastapi import HTTPException, status
 
 from backend.database import get_supabase_admin
 from backend.registration_availability import normalize_division_availability
+from backend.services.ai_evaluation_service import (
+    decode_resume_data_url,
+    detect_resume_mime_type,
+    evaluate_application_with_ai,
+)
 from backend.services.audit_service import log_action
 from backend.services.email_service import (
     preview_email,
@@ -177,7 +182,106 @@ def get_application_detail(application_id: int) -> Dict[str, Any]:
     )
     app["email_logs"] = email_res.data or []
 
+    # Resume metadata (raw base64 is served separately via /resume to keep detail payloads fast)
+    raw_resume = app.get("resume_base64")
+    app["has_resume"] = bool(raw_resume and isinstance(raw_resume, str) and raw_resume.strip())
+    app["resume_filename"] = app.get("resume_filename") or ("applicant_cv.pdf" if app["has_resume"] else None)
+    app["resume_mime_type"] = (
+        detect_resume_mime_type(raw_resume, app.get("resume_filename")) if app["has_resume"] else None
+    )
+
     return app
+
+
+def get_application_resume(application_id: int) -> Tuple[bytes, str, str]:
+    """Retrieves and decodes the uploaded CV/resume binary for an application."""
+    client = get_supabase_admin()
+    try:
+        res = (
+            client.table("registrations")
+            .select("id, resume_base64, resume_filename")
+            .eq("id", application_id)
+            .execute()
+        )
+    except Exception as exc:
+        if "column" in str(exc).lower() and "does not exist" in str(exc).lower():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No CV or resume attached for this applicant.",
+            )
+        raise
+
+    if not res.data or len(res.data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found",
+        )
+    row = res.data[0]
+    return decode_resume_data_url(row.get("resume_base64"), row.get("resume_filename"))
+
+
+def run_ai_evaluation(
+    application_id: int,
+    officer_id: str,
+    officer_name: str,
+    force_refresh: bool = False,
+) -> Dict[str, Any]:
+    """
+    Runs ATS AI evaluation for an applicant on demand.
+    Returns cached Supabase evaluation with 0 AI tokens spent when already evaluated unless force_refresh=True.
+    """
+    client = get_supabase_admin()
+    res = client.table("registrations").select("*").eq("id", application_id).execute()
+    if not res.data or len(res.data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found",
+        )
+    app = res.data[0]
+
+    existing = app.get("ai_evaluation")
+    if not force_refresh and isinstance(existing, dict) and existing.get("summary"):
+        return {
+            "cached": True,
+            "evaluation": existing,
+            "evaluated_at": app.get("ai_evaluated_at") or existing.get("evaluated_at"),
+        }
+
+    evaluation = evaluate_application_with_ai(app)
+    evaluated_at = evaluation.get("evaluated_at") or datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    try:
+        client.table("registrations").update({
+            "ai_evaluation": evaluation,
+            "ai_evaluated_at": evaluated_at,
+        }).eq("id", application_id).execute()
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "column" in err_msg and "does not exist" in err_msg:
+            print("Notice: ai_evaluation column not migrated yet; returning live AI result without DB cache.")
+        else:
+            print(f"Warning: Could not persist ai_evaluation for #{application_id}: {exc}")
+
+    log_action(
+        actor_id=officer_id,
+        actor_name=officer_name,
+        action="ai_evaluate_application",
+        target_type="registration",
+        target_id=str(application_id),
+        details={
+            "fit_score": evaluation.get("fit_score"),
+            "recommendation": evaluation.get("recommendation"),
+            "cv_status": evaluation.get("cv_status"),
+            "model": evaluation.get("model"),
+            "force_refresh": force_refresh,
+        },
+    )
+
+    return {
+        "cached": False,
+        "evaluation": evaluation,
+        "evaluated_at": evaluated_at,
+    }
 
 
 def claim_application(

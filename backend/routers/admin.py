@@ -13,6 +13,7 @@ from backend.schemas.admin import (
     OfficerResponse,
     QueueResponse,
     ApplicationDetail,
+    AiEvaluateRequest,
     ApplicationDecisionRequest,
     InternalNotesRequest,
     EmailPreviewRequest,
@@ -26,6 +27,8 @@ from backend.schemas.admin import (
 from backend.services.application_service import (
     get_application_queue,
     get_application_detail,
+    get_application_resume,
+    run_ai_evaluation,
     claim_application,
     release_application,
     add_internal_note,
@@ -171,6 +174,44 @@ def get_application(
 ):
     """Retrieves full application details, responses, review history, and email logs."""
     return get_application_detail(application_id)
+
+
+@router.get("/applications/{application_id}/resume")
+def get_application_resume_endpoint(
+    application_id: int,
+    download: bool = Query(False, description="Force file download instead of inline preview"),
+    user: OfficerUser = Depends(require_reviewer),
+):
+    """Streams the applicant's uploaded CV/resume binary for inline PDF preview or download."""
+    raw_bytes, mime_type, safe_name = get_application_resume(application_id)
+    disposition = "attachment" if download else "inline"
+    return Response(
+        content=raw_bytes,
+        media_type=mime_type,
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{safe_name}"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
+@router.post("/applications/{application_id}/ai-evaluate")
+def ai_evaluate_application_endpoint(
+    application_id: int,
+    payload: Optional[AiEvaluateRequest] = None,
+    user: OfficerUser = Depends(require_reviewer),
+):
+    """Runs or retrieves cached ATS AI evaluation for an applicant's CV and Statement of Interest."""
+    force_refresh = bool(payload.force_refresh) if payload else False
+    res = run_ai_evaluation(
+        application_id=application_id,
+        officer_id=user.id,
+        officer_name=user.full_name,
+        force_refresh=force_refresh,
+    )
+    if not res.get("cached"):
+        bump_sync_version("audit", event="ai_evaluated")
+    return res
 
 
 @router.post("/applications/{application_id}/claim")

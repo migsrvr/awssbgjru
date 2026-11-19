@@ -18,7 +18,7 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Lexend:wght@400;500;600&display=swap"
       rel="stylesheet" />
   </noscript>
-  <link rel="stylesheet" href="../css/admin.css?v=cache-sync-20261119" />
+  <link rel="stylesheet" href="../css/admin.css?v=ats-clean-20261119" />
   <script>
     // Immediately mark as authenticated if token exists to prevent login flash on refresh
     if (localStorage.getItem("admin_token")) {
@@ -465,96 +465,102 @@
       </div>
     </section>
 
-  </main>
-
-  <!-- Review Workspace Modal -->
-  <div class="modal-overlay" id="reviewModalOverlay">
-    <div class="modal-box">
-      <div class="modal-header">
-        <div>
-          <span class="modal-header-title" id="modalApplicantName">Applicant Profile</span>
-          <span id="modalStatusBadge"></span>
+    <!-- VIEW 7: Full-Page Applicant Review Workspace -->
+    <section class="admin-view" id="view-review">
+      <div class="review-topbar">
+        <div class="review-topbar-left">
+          <button type="button" class="btn-review-back" id="btnReviewBack" onclick="closeReviewModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            <span id="reviewBackLabel">Back to Queue</span>
+          </button>
+          <div class="review-topbar-identity">
+            <div class="review-topbar-name-row">
+              <h1 class="view-page-title" id="modalApplicantName">Applicant Profile</h1>
+              <span id="modalStatusBadge"></span>
+              <span class="review-division-chip" id="reviewDivisionChip">-</span>
+            </div>
+          </div>
         </div>
-        <button class="modal-close-btn" onclick="closeReviewModal()">✕</button>
+        <div class="review-topbar-actions">
+          <button id="btnModalClaim" class="review-act-btn review-act-claim">Claim</button>
+          <span class="review-act-divider" aria-hidden="true"></span>
+          <button class="review-act-btn review-act-neutral" onclick="initiateDecision('pending')">Pending</button>
+          <button class="review-act-btn review-act-revision" onclick="initiateDecision('revision_requested')">Request Revision</button>
+          <button class="review-act-btn review-act-decline" onclick="initiateDecision('declined')">Decline</button>
+          <button class="review-act-btn review-act-approve" onclick="initiateDecision('approved')">Approve</button>
+        </div>
       </div>
 
-      <div class="modal-body">
-        <div class="review-workspace-grid">
-          <!-- Left: Candidate Details & Essay -->
-          <div>
-            <div class="review-card">
-              <img id="modalPhotoPreview" src="" alt="Applicant Photo" class="applicant-photo-preview"
-                style="display: none;" />
-              <div class="field-pair">
-                <div class="field-pair-label">Student Number</div>
-                <div class="field-pair-val" id="modalStudentId">-</div>
-              </div>
-              <div class="field-pair">
-                <div class="field-pair-label">JRU Email</div>
-                <div class="field-pair-val" id="modalEmail">-</div>
-              </div>
-              <div class="field-pair">
-                <div class="field-pair-label">Program & Year</div>
-                <div class="field-pair-val" id="modalProgram">-</div>
-              </div>
-              <div class="field-pair">
-                <div class="field-pair-label">Date of Birth</div>
-                <div class="field-pair-val" id="modalDob">-</div>
-              </div>
-              <div class="field-pair">
-                <div class="field-pair-label">Selected Division</div>
-                <div class="field-pair-val field-pair-val-accent" id="modalDivision">-</div>
+      <div class="review-page-grid">
+        <!-- Left Column: Unified Applicant Dossier + Embedded Actual PDF Viewer -->
+        <div class="review-col-main">
+          <div class="review-panel-card dossier-card">
+            <div class="review-profile-header">
+              <img id="modalPhotoPreview" src="" alt="Applicant Photo" class="applicant-photo-preview" style="display: none;" />
+              <div class="review-profile-fields">
+                <div class="field-pair">
+                  <div class="field-pair-label">Student Number</div>
+                  <div class="field-pair-val" id="modalStudentId">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">JRU Email</div>
+                  <div class="field-pair-val" id="modalEmail">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">Program &amp; Year</div>
+                  <div class="field-pair-val" id="modalProgram">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">Date of Birth</div>
+                  <div class="field-pair-val" id="modalDob">-</div>
+                </div>
+                <div class="field-pair">
+                  <div class="field-pair-label">Selected Division</div>
+                  <div class="field-pair-val field-pair-val-accent" id="modalDivision">-</div>
+                </div>
               </div>
             </div>
 
-            <div class="review-card">
-              <div class="review-card-title">Statement of Interest / Why join AWS SBG JRU?</div>
+            <div class="dossier-statement-block">
+              <h2 class="dossier-subhead">Statement of Interest</h2>
               <div class="applicant-essay-box" id="modalExplanation"></div>
             </div>
           </div>
 
-          <!-- Right: Rubric Checklist & Internal Notes -->
-          <div>
-            <div class="review-card">
-              <div class="review-card-title">
-                <span>Review Assignment</span>
-                <button id="btnModalClaim" class="btn-sm btn-primary-sm">Claim Application</button>
+          <div class="review-panel-card cv-viewer-card">
+            <div class="cv-viewer-header">
+              <div>
+                <h2 class="dossier-subhead" style="margin-bottom: 0.1rem;">Applicant CV / Resume</h2>
+                <div class="cv-filename-sub" id="cvFileName">Checking attachment...</div>
               </div>
-              <p class="decision-hint">Claiming locks this application for 30 minutes to prevent duplicate reviews.</p>
-            </div>
-
-            <div class="review-card">
-              <div class="review-card-title">Qualification Rubric Support</div>
-              <div id="rubricContainer"></div>
-            </div>
-
-            <div class="review-card">
-              <div class="review-card-title">Internal Officer Notes (Private)</div>
-              <div class="notes-thread" id="notesThread"></div>
-              <div class="note-input-row">
-                <input type="text" id="inputQuickNote" placeholder="Add an internal observation..." />
-                <button class="btn-sm" onclick="submitQuickNote()">Add Note</button>
+              <div class="cv-toolbar-actions" id="cvToolbarActions" hidden>
+                <button type="button" class="review-act-btn review-act-neutral" onclick="openApplicantResumeInNewTab()">Open in New Tab</button>
+                <button type="button" class="btn-primary-navy" onclick="downloadApplicantResume()">Download PDF</button>
               </div>
             </div>
+            <div class="cv-viewer-body" id="cvViewerBody"></div>
+          </div>
+        </div>
+
+        <!-- Right Column: Clean White ATS Candidate Insights Panel -->
+        <div class="review-col-side">
+          <div class="ats-panel">
+            <div class="ats-hero-banner">
+              <div class="ats-hero-top">
+                <h2 class="ats-hero-title">ATS Candidate Insights</h2>
+                <button type="button" class="ats-reanalyze-btn" id="btnReanalyzeAi" onclick="triggerAiEvaluation(true)">Re-analyze</button>
+              </div>
+              <div id="atsHeroSummary" class="ats-hero-summary"></div>
+            </div>
+            <div id="atsInsightsBody" class="ats-insights-body"></div>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- Decision Action Bar -->
-      <div class="modal-footer">
-        <div class="decision-hint">
-          Human-in-the-loop: Every decision requires officer confirmation.
-        </div>
-        <div class="decision-btn-group">
-          <button class="btn-decision btn-pending" onclick="initiateDecision('pending')">Keep Pending</button>
-          <button class="btn-decision btn-revision" onclick="initiateDecision('revision_requested')">Request
-            Revision</button>
-          <button class="btn-decision btn-decline" onclick="initiateDecision('declined')">Decline</button>
-          <button class="btn-decision btn-approve" onclick="initiateDecision('approved')">Approve Applicant</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  </main>
 
   <!-- Email Preview & Confirmation Modal -->
   <div class="modal-overlay" id="emailModalOverlay">
@@ -705,7 +711,7 @@
   <!-- Toast Alerts Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script defer src="../js/admin.js?v=cache-sync-20261119"></script>
+  <script defer src="../js/admin.js?v=ats-clean-20261119"></script>
 </body>
 
 </html>

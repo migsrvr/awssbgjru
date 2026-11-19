@@ -62,6 +62,11 @@ class ApplicationDetail(ApplicationSummary):
     dob: Optional[str] = None
     photo_base64: Optional[str] = None
     explanation: Optional[str] = None
+    has_resume: bool = False
+    resume_filename: Optional[str] = None
+    resume_mime_type: Optional[str] = None
+    ai_evaluation: Optional[Dict[str, Any]] = None
+    ai_evaluated_at: Optional[str] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[str] = None
     decision_reason_code: Optional[str] = None
@@ -70,6 +75,10 @@ class ApplicationDetail(ApplicationSummary):
     revision_notes: Optional[str] = None
     reviews: List[ApplicationReviewItem] = Field(default_factory=list)
     email_logs: List[EmailLogItem] = Field(default_factory=list)
+
+
+class AiEvaluateRequest(BaseModel):
+    force_refresh: bool = False
 
 
 class QueueResponse(BaseModel):

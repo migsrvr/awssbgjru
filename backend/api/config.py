@@ -10,7 +10,12 @@ for p in env_paths:
         load_dotenv(p)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+GROQ_EVAL_MODEL = os.getenv("GROQ_EVAL_MODEL", "openai/gpt-oss-120b")
+GROQ_EVAL_FALLBACK_MODELS = (
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+)
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "20"))
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
