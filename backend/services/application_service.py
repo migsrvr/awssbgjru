@@ -1,9 +1,13 @@
+import copy
 import secrets
 import datetime
+import threading
+import time
 from typing import Dict, Any, List, Optional, Tuple
 from fastapi import HTTPException, status
 
 from backend.database import get_supabase_admin
+from backend.registration_availability import normalize_division_availability
 from backend.services.audit_service import log_action
 from backend.services.email_service import (
     preview_email,
@@ -13,6 +17,16 @@ from backend.services.email_service import (
 )
 
 CLAIM_LOCK_TIMEOUT_MINUTES = 30
+SETTINGS_CACHE_TTL_SECONDS = 15.0
+_SETTINGS_CACHE: Dict[str, Any] = {"value": None, "expires": 0.0, "client_id": None}
+_SETTINGS_CACHE_LOCK = threading.Lock()
+
+
+def clear_settings_cache() -> None:
+    with _SETTINGS_CACHE_LOCK:
+        _SETTINGS_CACHE["value"] = None
+        _SETTINGS_CACHE["expires"] = 0.0
+        _SETTINGS_CACHE["client_id"] = None
 
 
 def _parse_timestamp(ts: Any) -> Optional[datetime.datetime]:
@@ -424,9 +438,8 @@ def record_decision(
     }
 
 
-def get_system_settings() -> Dict[str, Any]:
-    """Fetches system settings (registration_status, qualification_rubric)."""
-    client = get_supabase_admin()
+def get_system_settings(force_refresh: bool = False) -> Dict[str, Any]:
+    """Fetches system settings (registration_status, qualification_rubric, division_availability)."""
     settings = {
         "registration_open": True,
         "closed_message": "Membership registration is currently closed. Follow our official channels for the next recruitment cycle.",
@@ -437,9 +450,22 @@ def get_system_settings() -> Dict[str, Any]:
             {"id": "code_of_conduct", "label": "Agrees to club code of conduct and student policies", "required": True},
             {"id": "quality_submission", "label": "Submitted information is authentic and non-abusive", "required": True},
         ],
+        "division_availability": normalize_division_availability(),
     }
 
     try:
+        client = get_supabase_admin()
+        client_id = id(client)
+        now = time.monotonic()
+        if not force_refresh:
+            with _SETTINGS_CACHE_LOCK:
+                if (
+                    _SETTINGS_CACHE["value"] is not None
+                    and _SETTINGS_CACHE["client_id"] == client_id
+                    and now < _SETTINGS_CACHE["expires"]
+                ):
+                    return copy.deepcopy(_SETTINGS_CACHE["value"])
+
         res = client.table("system_settings").select("*").execute()
         for row in res.data or []:
             key = row.get("key")
@@ -449,6 +475,13 @@ def get_system_settings() -> Dict[str, Any]:
                 settings["closed_message"] = val.get("closed_message", settings["closed_message"])
             elif key == "qualification_rubric" and isinstance(val, list):
                 settings["qualification_rubric"] = val
+            elif key == "division_availability" and isinstance(val, dict):
+                settings["division_availability"] = normalize_division_availability(val)
+
+        with _SETTINGS_CACHE_LOCK:
+            _SETTINGS_CACHE["value"] = copy.deepcopy(settings)
+            _SETTINGS_CACHE["expires"] = time.monotonic() + SETTINGS_CACHE_TTL_SECONDS
+            _SETTINGS_CACHE["client_id"] = client_id
     except Exception as e:
         print(f"Notice: Using default system settings: {e}")
 
@@ -459,14 +492,17 @@ def update_system_settings(
     registration_open: Optional[bool] = None,
     closed_message: Optional[str] = None,
     qualification_rubric: Optional[List[Dict[str, Any]]] = None,
+    division_availability: Optional[Dict[str, Dict[str, str]]] = None,
     officer_name: str = "Officer",
 ) -> Dict[str, Any]:
-    """Updates registration status or rubric settings."""
+    """Updates registration status, division availability, or rubric settings."""
     client = get_supabase_admin()
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    current = get_system_settings(force_refresh=True)
+
+    updated = copy.deepcopy(current)
 
     if registration_open is not None or closed_message is not None:
-        current = get_system_settings()
         reg_val = {
             "is_open": registration_open if registration_open is not None else current["registration_open"],
             "closed_message": closed_message if closed_message is not None else current["closed_message"],
@@ -477,6 +513,8 @@ def update_system_settings(
             "updated_at": now,
             "updated_by": officer_name,
         }).execute()
+        updated["registration_open"] = reg_val["is_open"]
+        updated["closed_message"] = reg_val["closed_message"]
 
     if qualification_rubric is not None:
         client.table("system_settings").upsert({
@@ -485,5 +523,24 @@ def update_system_settings(
             "updated_at": now,
             "updated_by": officer_name,
         }).execute()
+        updated["qualification_rubric"] = qualification_rubric
 
-    return get_system_settings()
+    if division_availability is not None:
+        merged_availability = normalize_division_availability(
+            division_availability,
+            base=current["division_availability"],
+        )
+        client.table("system_settings").upsert({
+            "key": "division_availability",
+            "value": merged_availability,
+            "updated_at": now,
+            "updated_by": officer_name,
+        }).execute()
+        updated["division_availability"] = merged_availability
+
+    with _SETTINGS_CACHE_LOCK:
+        _SETTINGS_CACHE["value"] = copy.deepcopy(updated)
+        _SETTINGS_CACHE["expires"] = time.monotonic() + SETTINGS_CACHE_TTL_SECONDS
+        _SETTINGS_CACHE["client_id"] = id(client)
+
+    return updated

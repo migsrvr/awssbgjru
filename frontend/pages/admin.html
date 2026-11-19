@@ -12,8 +12,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Lexend:wght@400;500;600&display=swap"
-    rel="stylesheet" />
-  <link rel="stylesheet" href="../css/admin.css" />
+    rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Lexend:wght@400;500;600&display=swap"
+      rel="stylesheet" />
+  </noscript>
+  <link rel="stylesheet" href="../css/admin.css?v=cache-sync-20261119" />
   <script>
     // Immediately mark as authenticated if token exists to prevent login flash on refresh
     if (localStorage.getItem("admin_token")) {
@@ -23,8 +28,8 @@
 </head>
 
 <body class="admin-body">
-  <!-- Top Navbar -->
-  <header class="admin-navbar" id="adminNavbar" style="display: none;">
+  <!-- Left Sidebar Navigation -->
+  <aside class="admin-sidebar" id="adminNavbar" style="display: none;">
     <a href="/" class="nav-brand">
       <img src="../assets/shared/components/AWS-NewLogo.webp" alt="AWS Logo" class="brand-logo" />
       <div class="brand-title-wrap">
@@ -32,31 +37,84 @@
         <span class="brand-badge">Officer Review Console</span>
       </div>
     </a>
+    <div class="sidebar-accent-rule" aria-hidden="true"></div>
 
-    <nav>
+    <nav class="sidebar-nav" aria-label="Admin navigation">
       <ul class="admin-nav-links">
-        <li><button class="admin-nav-tab active" data-view="dashboard"><span class="nav-tab-dot"
-              aria-hidden="true"></span><span>Dashboard</span></button></li>
-        <li><button class="admin-nav-tab" data-view="queue"><span class="nav-tab-dot"
-              aria-hidden="true"></span><span>Queue</span></button></li>
-        <li><button class="admin-nav-tab" data-view="templates"><span class="nav-tab-dot"
-              aria-hidden="true"></span><span>Email Templates</span></button></li>
-        <li class="admin-only"><button class="admin-nav-tab" data-view="settings"><span class="nav-tab-dot"
-              aria-hidden="true"></span><span>Settings</span></button></li>
-        <li class="admin-only"><button class="admin-nav-tab" data-view="audit"><span class="nav-tab-dot"
-              aria-hidden="true"></span><span>Audit Logs</span></button></li>
+        <li>
+          <button class="admin-nav-tab active" data-view="dashboard">
+            <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+            <span>Dashboard</span>
+          </button>
+        </li>
+        <li>
+          <button class="admin-nav-tab" data-view="queue">
+            <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+              <rect x="9" y="3" width="6" height="4" rx="1" />
+              <path d="M9 12h6" />
+              <path d="M9 16h6" />
+            </svg>
+            <span>Queue</span>
+          </button>
+        </li>
+        <li class="admin-only">
+          <button class="admin-nav-tab" data-view="departments">
+            <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span>Departments</span>
+          </button>
+        </li>
+        <li>
+          <button class="admin-nav-tab" data-view="templates">
+            <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            </svg>
+            <span>Email Templates</span>
+          </button>
+        </li>
+        <li class="admin-only">
+          <button class="admin-nav-tab" data-view="settings">
+            <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span>Settings</span>
+          </button>
+        </li>
+        <li class="admin-only">
+          <button class="admin-nav-tab" data-view="audit">
+            <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <polyline points="12 7 12 12 15 15" />
+            </svg>
+            <span>Audit Logs</span>
+          </button>
+        </li>
       </ul>
     </nav>
 
-    <div class="nav-user-ctrl">
-      <div class="officer-badge">
-        <span class="officer-dot"></span>
-        <span id="officerName">Officer</span>
-        <span id="officerRole" class="officer-role"></span>
-      </div>
-      <button class="btn-logout" id="btnLogout">Sign Out</button>
+    <div class="sidebar-footer">
+      <button class="btn-logout" id="btnLogout">
+        <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        <span>Sign Out</span>
+      </button>
     </div>
-  </header>
+  </aside>
 
   <!-- Login Screen View (Shown when unauthenticated) -->
   <div class="login-screen-wrap" id="loginScreen">
@@ -85,14 +143,18 @@
 
     <!-- VIEW 1: Dashboard -->
     <section class="admin-view active" id="view-dashboard">
-      <div class="kpi-grid">
+      <div class="view-header-card">
+        <div>
+          <h1 class="view-page-title">Dashboard</h1>
+          <p class="view-page-sub">Live overview of incoming membership applications and officer review turnaround.</p>
+        </div>
+        <button class="btn-primary-navy" onclick="switchView('queue')">Open Review Queue</button>
+      </div>
+
+      <div class="kpi-row kpi-row-4">
         <div class="kpi-card kpi-orange">
           <div class="kpi-label">Total Applications</div>
           <div class="kpi-val" id="metricTotal">0</div>
-        </div>
-        <div class="kpi-card kpi-cyan">
-          <div class="kpi-label">Median Turnaround</div>
-          <div class="kpi-val" id="metricTurnaround">0 hrs</div>
         </div>
         <div class="kpi-card kpi-cyan">
           <div class="kpi-label">New in Queue</div>
@@ -102,6 +164,13 @@
           <div class="kpi-label">Under Review</div>
           <div class="kpi-val" id="metricUnderReview">0</div>
         </div>
+        <div class="kpi-card kpi-cyan">
+          <div class="kpi-label">Median Turnaround</div>
+          <div class="kpi-val" id="metricTurnaround">0 hrs</div>
+        </div>
+      </div>
+
+      <div class="kpi-row kpi-row-3">
         <div class="kpi-card kpi-green">
           <div class="kpi-label">Approved</div>
           <div class="kpi-val" id="metricApproved">0</div>
@@ -116,29 +185,37 @@
         </div>
       </div>
 
-      <div class="section-head">
-        <h2 class="section-title section-title-sm">Incoming Applications Waiting for Review</h2>
-        <button class="btn-sm btn-primary-sm" onclick="switchView('queue')">View Full Queue</button>
-      </div>
-
       <div class="table-container">
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Applicant</th>
-              <th>Program & Year</th>
-              <th>Division</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="recentQueueBody"></tbody>
-        </table>
+        <div class="table-card-header">
+          <h2 class="table-card-title">Incoming Applications Waiting for Review</h2>
+          <button class="btn-sm btn-primary-sm" onclick="switchView('queue')">View Full Queue</button>
+        </div>
+        <div class="table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Program &amp; Year</th>
+                <th>Division</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="recentQueueBody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
     <!-- VIEW 2: Application Queue -->
     <section class="admin-view" id="view-queue">
+      <div class="view-header-card">
+        <div>
+          <h1 class="view-page-title">Application Queue</h1>
+          <p class="view-page-sub">Filter, claim, and review student membership applications.</p>
+        </div>
+        <button class="btn-primary-navy" onclick="exportCsv()">Export CSV</button>
+      </div>
       <!-- Status Pills -->
       <div class="status-pill-strip">
         <button class="status-pill-btn active" data-status="new">New <span class="status-pill-count">0</span></button>
@@ -223,12 +300,92 @@
       </div>
     </section>
 
-    <!-- VIEW 3: Email Templates -->
-    <section class="admin-view" id="view-templates">
-      <div class="section-head">
+    <!-- VIEW 3: Departments (Admin Only) -->
+    <section class="admin-view" id="view-departments">
+      <div class="dept-page-header">
         <div>
-          <h2 class="section-title">Standard Email Templates</h2>
-          <p class="section-sub">Manage and standardize automated and officer-dispatched communication.</p>
+          <h2 class="dept-page-title">Department Availability</h2>
+          <p class="dept-page-sub">Control which Offices and Skill Builder tracks are open to new applicants. Closed teams display the <strong>FULL</strong> ribbon on the registration flow.</p>
+        </div>
+        <div class="dept-header-actions">
+          <span class="dept-dirty-pill" id="deptDirtyIndicator" hidden>Unsaved changes</span>
+          <button type="button" class="dept-btn-reset" id="btnResetDepartments" onclick="resetDepartmentChanges()" hidden>Reset</button>
+          <button type="button" class="dept-btn-save" id="btnSaveDepartments" onclick="saveDepartmentAvailability()" disabled>Save Changes</button>
+        </div>
+      </div>
+
+      <!-- Summary KPI Strip -->
+      <div class="dept-kpi-grid">
+        <div class="kpi-card kpi-orange">
+          <div class="kpi-label">Total Divisions</div>
+          <div class="kpi-val" id="deptKpiTotal">11</div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">Open for Applications</div>
+          <div class="kpi-val" id="deptKpiOpen">0</div>
+        </div>
+        <div class="kpi-card kpi-red">
+          <div class="kpi-label">Full / Closed</div>
+          <div class="kpi-val" id="deptKpiFull">0</div>
+        </div>
+      </div>
+
+      <!-- Two Standalone Elevated Department Panels -->
+      <div class="dept-panels-grid">
+        <div class="dept-panel dept-panel-office">
+          <div class="dept-panel-head">
+            <div class="dept-panel-identity">
+              <div class="dept-panel-icon dept-panel-icon-office">
+                <img src="../assets/members/badges/Officers-Active-Badge.webp" alt="Offices" />
+              </div>
+              <div>
+                <h3 class="dept-panel-title">Offices</h3>
+                <p class="dept-panel-meta" id="officeOpenCount">0 of 5 divisions open</p>
+              </div>
+            </div>
+            <div class="dept-panel-quick">
+              <button type="button" class="dept-link-btn" onclick="toggleDepartmentGroup('office', 'open')">Open all</button>
+              <span class="dept-link-sep" aria-hidden="true">·</span>
+              <button type="button" class="dept-link-btn dept-link-btn-muted" onclick="toggleDepartmentGroup('office', 'full')">Close all</button>
+            </div>
+          </div>
+          <div class="dept-progress-track" aria-hidden="true">
+            <div class="dept-progress-fill dept-progress-office" id="officeProgressFill" style="width: 0%;"></div>
+          </div>
+          <div class="dept-rows" id="divisionSettingsOffice"></div>
+        </div>
+
+        <div class="dept-panel dept-panel-skillbuilder">
+          <div class="dept-panel-head">
+            <div class="dept-panel-identity">
+              <div class="dept-panel-icon dept-panel-icon-sb">
+                <img src="../assets/members/badges/SkillBuilder-Active-Badge.webp" alt="Skill Builder" />
+              </div>
+              <div>
+                <h3 class="dept-panel-title">Skill Builder</h3>
+                <p class="dept-panel-meta" id="skillbuilderOpenCount">0 of 6 divisions open</p>
+              </div>
+            </div>
+            <div class="dept-panel-quick">
+              <button type="button" class="dept-link-btn" onclick="toggleDepartmentGroup('skillbuilder', 'open')">Open all</button>
+              <span class="dept-link-sep" aria-hidden="true">·</span>
+              <button type="button" class="dept-link-btn dept-link-btn-muted" onclick="toggleDepartmentGroup('skillbuilder', 'full')">Close all</button>
+            </div>
+          </div>
+          <div class="dept-progress-track" aria-hidden="true">
+            <div class="dept-progress-fill dept-progress-sb" id="skillbuilderProgressFill" style="width: 0%;"></div>
+          </div>
+          <div class="dept-rows" id="divisionSettingsSkillbuilder"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: Email Templates -->
+    <section class="admin-view" id="view-templates">
+      <div class="view-header-card">
+        <div>
+          <h1 class="view-page-title">Standard Email Templates</h1>
+          <p class="view-page-sub">Manage and standardize automated and officer-dispatched communication.</p>
         </div>
       </div>
 
@@ -258,53 +415,53 @@
       </div>
     </section>
 
-    <!-- VIEW 4: Settings -->
+    <!-- VIEW 5: Settings -->
     <section class="admin-view" id="view-settings">
-      <div class="section-head">
+      <div class="view-header-card">
         <div>
-          <h2 class="section-title">Operational Settings</h2>
-          <p class="section-sub">Configure registration availability and review rules.</p>
+          <h1 class="view-page-title">Operational Settings</h1>
+          <p class="view-page-sub">Configure global recruitment availability and closed-portal messaging.</p>
         </div>
       </div>
 
       <div class="content-card content-card-narrow">
-        <div class="review-card">
-          <h3 class="review-card-title">Recruitment Portal Status</h3>
-          <label class="setting-check-row">
-            <input type="checkbox" id="settingRegistrationOpen" />
-            <span class="setting-check-label">Accepting Membership Applications</span>
-          </label>
-          <div class="form-group">
-            <label>Message displayed to applicants when registration is closed</label>
-            <textarea id="settingClosedMessage" class="email-body-editor email-body-editor-short"></textarea>
-          </div>
-          <button class="btn-sm btn-primary-sm" onclick="saveSettings()">Save Settings</button>
+        <h2 class="review-card-title">Recruitment Portal Status</h2>
+        <label class="setting-check-row">
+          <input type="checkbox" id="settingRegistrationOpen" />
+          <span class="setting-check-label">Accepting Membership Applications</span>
+        </label>
+        <div class="form-group">
+          <label>Message displayed to applicants when registration is closed</label>
+          <textarea id="settingClosedMessage" class="email-body-editor email-body-editor-short"></textarea>
         </div>
+        <button class="btn-primary-navy" onclick="saveSettings()">Save Settings</button>
       </div>
     </section>
 
-    <!-- VIEW 5: Audit Logs -->
+    <!-- VIEW 6: Audit Logs -->
     <section class="admin-view" id="view-audit">
-      <div class="section-head">
+      <div class="view-header-card">
         <div>
-          <h2 class="section-title">Operational Audit Trail</h2>
-          <p class="section-sub">Complete record of reviewer actions, decisions, and system events.</p>
+          <h1 class="view-page-title">Operational Audit Trail</h1>
+          <p class="view-page-sub">Complete chronological record of reviewer actions, decisions, and system events.</p>
         </div>
       </div>
 
       <div class="table-container">
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Timestamp (UTC)</th>
-              <th>Officer</th>
-              <th>Action</th>
-              <th>Target</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody id="auditLogTableBody"></tbody>
-        </table>
+        <div class="table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Timestamp (UTC)</th>
+                <th>Officer</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditLogTableBody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -548,7 +705,7 @@
   <!-- Toast Alerts Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="../js/admin.js"></script>
+  <script defer src="../js/admin.js?v=cache-sync-20261119"></script>
 </body>
 
 </html>

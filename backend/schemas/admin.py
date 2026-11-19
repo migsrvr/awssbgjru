@@ -170,12 +170,14 @@ class SystemSettingsResponse(BaseModel):
     registration_open: bool
     closed_message: str
     qualification_rubric: List[Dict[str, Any]]
+    division_availability: Dict[str, Dict[str, Literal["open", "full"]]]
 
 
 class SystemSettingsUpdateRequest(BaseModel):
     registration_open: Optional[bool] = None
     closed_message: Optional[str] = None
     qualification_rubric: Optional[List[Dict[str, Any]]] = None
+    division_availability: Optional[Dict[str, Dict[str, Literal["open", "full"]]]] = None
 
 
 class RevisionViewResponse(BaseModel):

@@ -19,6 +19,7 @@ from backend.registration_availability import (
     validate_division_eligibility,
 )
 from backend.services.application_service import get_system_settings
+from backend.services.sync_service import bump_sync_version
 
 router = APIRouter(prefix="/api", tags=["registration"])
 register_limiter = RateLimiter(requests=5, window=60)
@@ -45,7 +46,11 @@ async def register(request: Request, data: RegistrationRequest):
         return JSONResponse({"error": "Bot detected"}, status_code=422)
 
     try:
-        validate_division_availability(data.division_type, data.division_name)
+        validate_division_availability(
+            data.division_type,
+            data.division_name,
+            availability=settings.get("division_availability"),
+        )
     except DivisionAvailabilityError as exc:
         return JSONResponse(
             {"error": exc.message, "code": exc.code},
@@ -129,6 +134,7 @@ async def register(request: Request, data: RegistrationRequest):
         raise HTTPException(status_code=500, detail="Failed to insert registration")
 
     inserted_id = result.data[0]["id"]
+    bump_sync_version("applications", event="new_registration")
 
     try:
         _send_notification(data)

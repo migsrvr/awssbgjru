@@ -4,8 +4,9 @@ PORT = 8000
 BACKEND_PORT = 8001
 
 
-class ReuseAddrServer(socketserver.TCPServer):
+class ReuseAddrServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
+    daemon_threads = True
     def server_bind(self):
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         super().server_bind()
@@ -80,7 +81,7 @@ class RewriteHandler(http.server.SimpleHTTPRequestHandler):
 
 
     def _proxy_api(self):
-        backend_url = f"http://localhost:{BACKEND_PORT}{self.path}"
+        backend_url = f"http://127.0.0.1:{BACKEND_PORT}{self.path}"
         body = None
         if self.command in ("POST", "PUT", "PATCH"):
             length = int(self.headers.get("Content-Length", 0))

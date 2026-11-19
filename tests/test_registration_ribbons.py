@@ -5,6 +5,7 @@ from backend.api.config import VALID_DIVISIONS
 from backend.registration_availability import (
     DIVISION_STATUS,
     DivisionAvailabilityError,
+    normalize_division_availability,
     validate_division_eligibility,
     validate_division_availability,
 )
@@ -174,6 +175,51 @@ class RegistrationAvailabilityTest(unittest.TestCase):
             office,
             r'<script src="\.\./js/office\.js\?v=[^"]+"></script>',
         )
+
+    def test_normalize_division_availability_merges_and_sanitizes(self):
+        normalized = normalize_division_availability(
+            {
+                "office": {
+                    "Operations": "full",
+                    "Marketing": "open",
+                    "UnknownDept": "full",
+                    "Relations": "invalid_status",
+                },
+                "skillbuilder": {
+                    "Web Development": "open",
+                },
+                "extra_group": {"Foo": "open"},
+            }
+        )
+        self.assertEqual(normalized["office"]["Operations"], "full")
+        self.assertEqual(normalized["office"]["Marketing"], "open")
+        self.assertEqual(normalized["office"]["Relations"], "open")
+        self.assertNotIn("UnknownDept", normalized["office"])
+        self.assertEqual(normalized["skillbuilder"]["Web Development"], "open")
+        self.assertEqual(normalized["skillbuilder"]["Software Development"], "open")
+        self.assertNotIn("extra_group", normalized)
+
+    def test_validate_division_availability_respects_dynamic_override(self):
+        custom_map = normalize_division_availability(
+            {
+                "office": {"Operations": "full", "Marketing": "open"},
+                "skillbuilder": {"Software Development": "full", "Web Development": "open"},
+            }
+        )
+        validate_division_availability("office", "Marketing", availability=custom_map)
+        validate_division_availability("skillbuilder", "Web Development", availability=custom_map)
+
+        with self.assertRaisesRegex(
+            DivisionAvailabilityError,
+            "This team is full! Please choose another!",
+        ):
+            validate_division_availability("office", "Operations", availability=custom_map)
+
+        with self.assertRaisesRegex(
+            DivisionAvailabilityError,
+            "This team is full! Please choose another!",
+        ):
+            validate_division_availability("skillbuilder", "Software Development", availability=custom_map)
 
 
 if __name__ == "__main__":

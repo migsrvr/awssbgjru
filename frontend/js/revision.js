@@ -83,6 +83,14 @@ document.addEventListener("DOMContentLoaded", () => {
           return res.json();
         })
         .then(() => {
+          try {
+            if (typeof BroadcastChannel !== "undefined") {
+              const bc = new BroadcastChannel("awssbg_sync");
+              bc.postMessage({ type: "mutation", scope: "applications", event: "revision_submitted", ts: Date.now() });
+              bc.close();
+            }
+            localStorage.setItem("awssbg_last_post_event", JSON.stringify({ scope: "applications", event: "revision_submitted", ts: Date.now() }));
+          } catch (_) {}
           formWrap.style.display = "none";
           successWrap.style.display = "block";
         })

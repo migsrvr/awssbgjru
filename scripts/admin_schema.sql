@@ -250,5 +250,25 @@ VALUES
         {"id": "code_of_conduct", "label": "Agrees to club code of conduct and student policies", "required": true},
         {"id": "quality_submission", "label": "Submitted information is authentic and non-abusive", "required": true}
     ]'::jsonb
+),
+(
+    'division_availability',
+    '{
+        "office": {
+            "Relations": "open",
+            "Operations": "open",
+            "Creatives": "open",
+            "Marketing": "full",
+            "Media": "full"
+        },
+        "skillbuilder": {
+            "Software Development": "open",
+            "Web Development": "full",
+            "UI/UX": "open",
+            "Data Analyst": "full",
+            "Cloud Computing": "full",
+            "Machine Learning & AI": "full"
+        }
+    }'::jsonb
 )
 ON CONFLICT (key) DO NOTHING;

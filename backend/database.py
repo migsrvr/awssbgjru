@@ -1,3 +1,4 @@
+import threading
 from typing import Optional
 from supabase import create_client, Client
 
@@ -5,6 +6,7 @@ from backend.api.config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_ROLE
 
 supabase: Optional[Client] = None
 supabase_admin: Optional[Client] = None
+_admin_client_lock = threading.Lock()
 
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -21,13 +23,21 @@ if SUPABASE_URL and admin_key:
 
 
 def get_supabase_admin() -> Client:
-    """Returns the privileged admin client initialized with the service-role key."""
-    admin_key = SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY
-    if not SUPABASE_URL or not admin_key:
-        raise RuntimeError(
-            "Supabase client not initialized. Ensure SUPABASE_URL and SUPABASE_KEY or SUPABASE_SERVICE_ROLE_KEY are set."
-        )
-    return create_client(SUPABASE_URL, admin_key)
+    """Returns the cached privileged admin client initialized with the service-role key."""
+    global supabase_admin
+    if supabase_admin is not None:
+        return supabase_admin
+
+    with _admin_client_lock:
+        if supabase_admin is not None:
+            return supabase_admin
+        key = SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY
+        if not SUPABASE_URL or not key:
+            raise RuntimeError(
+                "Supabase client not initialized. Ensure SUPABASE_URL and SUPABASE_KEY or SUPABASE_SERVICE_ROLE_KEY are set."
+            )
+        supabase_admin = create_client(SUPABASE_URL, key)
+        return supabase_admin
 
 
 def get_supabase_auth_client() -> Client:

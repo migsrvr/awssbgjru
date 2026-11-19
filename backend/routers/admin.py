@@ -40,12 +40,13 @@ from backend.services.email_service import (
     DEFAULT_TEMPLATES,
 )
 from backend.services.audit_service import log_action
+from backend.services.sync_service import bump_sync_version, get_sync_state
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 
 @router.post("/auth/login", response_model=LoginResponse)
-async def login_endpoint(payload: LoginRequest):
+def login_endpoint(payload: LoginRequest):
     """Authenticates an officer via Supabase Auth and validates their role in admin_users."""
     if not SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(
@@ -116,9 +117,18 @@ async def login_endpoint(payload: LoginRequest):
 
 
 
-@router.get("/me", response_model=OfficerResponse)
+@router.get("/sync-version")
+def get_admin_sync_version(
+    response: Response,
+    user: OfficerUser = Depends(require_reviewer),
+):
+    """Lightweight sync version stamp that bumps only on POST/PUT mutations."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return get_sync_state()
 
-async def get_me(user: OfficerUser = Depends(require_reviewer)):
+
+@router.get("/me", response_model=OfficerResponse)
+def get_me(user: OfficerUser = Depends(require_reviewer)):
     """Returns the authenticated officer's identity and role."""
     return OfficerResponse(
         id=user.id,
@@ -129,7 +139,7 @@ async def get_me(user: OfficerUser = Depends(require_reviewer)):
 
 
 @router.get("/applications", response_model=QueueResponse)
-async def list_applications(
+def list_applications(
     status: Optional[str] = Query(None, description="Filter by status (new, under_review, approved, etc.)"),
     search: Optional[str] = Query(None, description="Search by name, student ID, or email"),
     year: Optional[str] = Query(None, description="Filter by school year"),
@@ -155,7 +165,7 @@ async def list_applications(
 
 
 @router.get("/applications/{application_id}", response_model=ApplicationDetail)
-async def get_application(
+def get_application(
     application_id: int,
     user: OfficerUser = Depends(require_reviewer),
 ):
@@ -164,27 +174,29 @@ async def get_application(
 
 
 @router.post("/applications/{application_id}/claim")
-async def claim(
+def claim(
     application_id: int,
     user: OfficerUser = Depends(require_reviewer),
 ):
     """Assigns the application to the requesting reviewer with a 30-minute lock."""
     res = claim_application(application_id, user.id, user.full_name)
+    bump_sync_version("applications", event="application_claimed")
     return {"success": True, "message": "Application claimed successfully", "application": res}
 
 
 @router.post("/applications/{application_id}/release")
-async def release(
+def release(
     application_id: int,
     user: OfficerUser = Depends(require_reviewer),
 ):
     """Releases the application claim back to the unassigned queue."""
     res = release_application(application_id, user.id, user.full_name)
+    bump_sync_version("applications", event="application_released")
     return {"success": True, "message": "Application released", "application": res}
 
 
 @router.post("/applications/{application_id}/notes")
-async def add_notes(
+def add_notes(
     application_id: int,
     payload: InternalNotesRequest,
     user: OfficerUser = Depends(require_reviewer),
@@ -193,11 +205,12 @@ async def add_notes(
     if not payload.notes.strip():
         raise HTTPException(status_code=400, detail="Note text cannot be empty")
     res = add_internal_note(application_id, payload.notes.strip(), user.id, user.full_name)
+    bump_sync_version("audit", event="note_added")
     return {"success": True, "review": res}
 
 
 @router.post("/applications/{application_id}/decision")
-async def submit_decision(
+def submit_decision(
     application_id: int,
     payload: ApplicationDecisionRequest,
     user: OfficerUser = Depends(require_reviewer),
@@ -226,11 +239,12 @@ async def submit_decision(
         division_chat_label=payload.division_chat_label,
         division_qr_base64=payload.division_qr_base64,
     )
+    bump_sync_version("applications", event=f"decision_{payload.decision}")
     return res
 
 
 @router.post("/applications/{application_id}/email/preview", response_model=EmailPreviewResponse)
-async def preview_application_email(
+def preview_application_email(
     application_id: int,
     payload: EmailPreviewRequest,
     user: OfficerUser = Depends(require_reviewer),
@@ -263,7 +277,7 @@ async def preview_application_email(
 
 
 @router.post("/applications/{application_id}/email/send")
-async def send_application_email(
+def send_application_email(
     application_id: int,
     payload: EmailSendRequest,
     user: OfficerUser = Depends(require_reviewer),
@@ -287,11 +301,12 @@ async def send_application_email(
         target_id=str(application_id),
         details={"subject": payload.subject, "result": res},
     )
+    bump_sync_version("audit", event="email_sent")
     return res
 
 
 @router.get("/templates", response_model=List[EmailTemplateItem])
-async def list_templates(user: OfficerUser = Depends(require_reviewer)):
+def list_templates(user: OfficerUser = Depends(require_reviewer)):
     """Lists all active email templates."""
     client = get_supabase_admin()
     templates = []
@@ -327,7 +342,7 @@ async def list_templates(user: OfficerUser = Depends(require_reviewer)):
 
 
 @router.put("/templates/{template_id}")
-async def update_template_endpoint(
+def update_template_endpoint(
     template_id: str,
     payload: EmailTemplateUpdateRequest,
     user: OfficerUser = Depends(require_admin),
@@ -352,17 +367,18 @@ async def update_template_endpoint(
         target_type="email_template",
         target_id=template_id,
     )
+    bump_sync_version("templates", event="template_updated")
     return {"success": True, "template": res.data[0] if res.data else update_data}
 
 
 @router.get("/settings", response_model=SystemSettingsResponse)
-async def get_settings_endpoint(user: OfficerUser = Depends(require_reviewer)):
+def get_settings_endpoint(user: OfficerUser = Depends(require_reviewer)):
     """Fetches system-wide operational settings."""
     return get_system_settings()
 
 
 @router.put("/settings", response_model=SystemSettingsResponse)
-async def update_settings_endpoint(
+def update_settings_endpoint(
     payload: SystemSettingsUpdateRequest,
     user: OfficerUser = Depends(require_admin),
 ):
@@ -371,6 +387,7 @@ async def update_settings_endpoint(
         registration_open=payload.registration_open,
         closed_message=payload.closed_message,
         qualification_rubric=payload.qualification_rubric,
+        division_availability=payload.division_availability,
         officer_name=user.full_name,
     )
     log_action(
@@ -381,13 +398,18 @@ async def update_settings_endpoint(
         details={
             "registration_open": payload.registration_open,
             "rubric_updated": payload.qualification_rubric is not None,
+            "division_availability_updated": payload.division_availability is not None,
+            "division_availability": updated.get("division_availability")
+            if payload.division_availability is not None
+            else None,
         },
     )
+    bump_sync_version("settings", event="settings_updated")
     return updated
 
 
 @router.get("/metrics")
-async def get_metrics(user: OfficerUser = Depends(require_reviewer)):
+def get_metrics(user: OfficerUser = Depends(require_reviewer)):
     """Computes dashboard metrics: review turnaround time, decisions by reviewer, status totals."""
     client = get_supabase_admin()
     res = client.table("registrations").select("id, application_status, created_at, reviewed_at, reviewed_by, division_type, division_name").execute()
@@ -440,7 +462,7 @@ async def get_metrics(user: OfficerUser = Depends(require_reviewer)):
 
 
 @router.get("/audit-logs")
-async def get_audit_logs(
+def get_audit_logs(
     limit: int = Query(50, ge=1, le=200),
     user: OfficerUser = Depends(require_reviewer),
 ):
@@ -460,7 +482,7 @@ async def get_audit_logs(
 
 
 @router.get("/export")
-async def export_applications(
+def export_applications(
     status: Optional[str] = Query(None),
     user: OfficerUser = Depends(require_admin),
 ):

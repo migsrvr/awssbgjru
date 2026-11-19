@@ -1,5 +1,5 @@
 import datetime
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from backend.database import get_supabase_admin
 from backend.schemas.admin import (
@@ -8,17 +8,21 @@ from backend.schemas.admin import (
 )
 from backend.services.application_service import get_system_settings
 from backend.services.audit_service import log_action
+from backend.services.sync_service import bump_sync_version
 
 router = APIRouter(prefix="/api/v1/revision", tags=["revision"])
 
 
 @router.get("/status/registration")
-async def get_registration_status():
-    """Public endpoint to check whether membership registration is active."""
+def get_registration_status(response: Response):
+    """Public endpoint to check whether membership registration and divisions are active."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
     settings = get_system_settings()
     return {
         "is_open": settings.get("registration_open", True),
         "message": settings.get("closed_message", "Registration is currently closed."),
+        "division_availability": settings.get("division_availability", {}),
     }
 
 
@@ -123,6 +127,7 @@ async def submit_revision(token: str, payload: RevisionSubmitRequest):
         target_type="registration",
         target_id=str(app_id),
     )
+    bump_sync_version("applications", event="revision_submitted")
 
     return {
         "success": True,
