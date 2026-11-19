@@ -1,0 +1,29 @@
+# Git & IDE
+.git
+.gitignore
+.github
+.vscode
+.playwright-mcp
+
+# Python caches & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Secrets & environment files (never bake into images)
+.env
+*.env
+backend/api/.env
+
+# Heavy local-only RAG index & tests
+backend/faiss_index/
+backend/tests/
+tests/
+node_modules/
+frontend/scratch/
+docs/
+scripts/
