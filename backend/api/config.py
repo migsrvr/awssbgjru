@@ -26,7 +26,35 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 # App URL for emails and links
-APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+
+DEFAULT_ALLOWED_ORIGINS = (
+    "https://awssbgjru.me",
+    "https://www.awssbgjru.me",
+    "https://awslearningclub.jru",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://localhost:8080",
+    "http://localhost:8081",
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8001",
+)
+
+
+def parse_allowed_origins(raw_origins: str = "", app_base_url: str = APP_BASE_URL) -> list[str]:
+    origins: list[str] = []
+    candidates = [
+        *(item.strip().rstrip("/") for item in (raw_origins or "").split(",") if item.strip()),
+        (app_base_url or "").strip().rstrip("/"),
+        *DEFAULT_ALLOWED_ORIGINS,
+    ]
+    for origin in candidates:
+        if origin and origin not in origins:
+            origins.append(origin)
+    return origins
+
+
+ALLOWED_ORIGINS = parse_allowed_origins(os.getenv("ALLOWED_ORIGINS", ""), APP_BASE_URL)
 
 # Valid registration divisions (must match frontend pill options)
 VALID_DIVISIONS = {
@@ -45,4 +73,11 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USER = os.getenv("EMAIL_USER", "")
 EMAIL_PASS = os.getenv("EMAIL_PASS", "")
 NOTIFY_EMAIL = os.getenv("NOTIFY_EMAIL", "")
+
+# Built-in Executive Account (optional — configured via server .env, zero Supabase setup required)
+EXECUTIVE_USERNAME = os.getenv("EXECUTIVE_USERNAME", "").strip()
+EXECUTIVE_PASSWORD = os.getenv("EXECUTIVE_PASSWORD", "")
+EXECUTIVE_FULL_NAME = os.getenv("EXECUTIVE_FULL_NAME", "AWS SBG Executive").strip() or "AWS SBG Executive"
+EXECUTIVE_SECRET = os.getenv("EXECUTIVE_SECRET", "")
+EXECUTIVE_SESSION_TTL_HOURS = int(os.getenv("EXECUTIVE_SESSION_TTL_HOURS", "12"))
 

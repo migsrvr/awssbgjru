@@ -101,6 +101,15 @@
             <span>Audit Logs</span>
           </button>
         </li>
+        <li class="executive-only" style="display: none;">
+          <button class="admin-nav-tab" data-view="portal">
+            <svg class="nav-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span>Portal &amp; API</span>
+          </button>
+        </li>
       </ul>
     </nav>
 
@@ -560,6 +569,270 @@
       </div>
     </section>
 
+    <!-- VIEW 8: Executive Portal & External Validation API Manager (Executive Only) -->
+    <section class="admin-view" id="view-portal">
+      <div class="view-header-card">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <h1 class="view-page-title">Centralized Member Portal &amp; External API</h1>
+            <span class="portal-exec-badge">EXECUTIVE ONLY</span>
+          </div>
+          <p class="view-page-sub">Bulk-provision unique Org IDs (<code>AWSSBG-MMDD-NNN</code>), randomized usernames, and automated email credentials, and manage read-only validation API keys &amp; plug-and-play SDKs.</p>
+        </div>
+        <div class="portal-subtab-strip">
+          <button type="button" class="portal-subtab-btn active" data-subtab="members" onclick="switchPortalSubTab('members')">Members &amp; Generator</button>
+          <button type="button" class="portal-subtab-btn" data-subtab="apikeys" onclick="switchPortalSubTab('apikeys')">API Keys &amp; Logs</button>
+          <button type="button" class="portal-subtab-btn" data-subtab="sdk" onclick="switchPortalSubTab('sdk')">Plug &amp; Play SDK / AI Agents</button>
+        </div>
+      </div>
+
+      <!-- SUBPANEL 1: Members & Bulk Credential Generator -->
+      <div class="portal-subpanel" id="portal-subpanel-members">
+        <div id="portalBatchResultBanner" class="portal-batch-banner" style="display: none;"></div>
+
+        <div class="table-container" style="margin-bottom: 1.5rem;">
+          <div class="table-card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <h2 class="table-card-title">Bulk Member Credential Generator</h2>
+              <p class="view-page-sub" style="margin-top: 0.2rem;">Generates <code>AWSSBG-MMDD-NNN</code>, randomized username, and a salted PBKDF2 password hash. Temporary passwords are emailed directly to each student and never exposed in the UI or logs.</p>
+            </div>
+            <div class="portal-genmode-strip">
+              <button type="button" class="portal-genmode-btn active" data-genmode="approved" onclick="switchGeneratorMode('approved')">
+                From Approved Applicants (<span id="portalUnprovisionedCount">0</span>)
+              </button>
+              <button type="button" class="portal-genmode-btn" data-genmode="csv" onclick="switchGeneratorMode('csv')">
+                Upload CSV (External / Unregistered)
+              </button>
+            </div>
+          </div>
+
+          <!-- Mode A: Approved Applicants from Registrations Table -->
+          <div id="portalGenApprovedBox">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; border-bottom: 1px solid #eef2f7;">
+              <label style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" id="portalSelectAllApproved" onchange="toggleSelectAllApproved(this.checked)" />
+                <span>Select All Unprovisioned Approved Applicants</span>
+              </label>
+              <button type="button" class="btn-primary-navy" id="btnGenerateFromApproved" disabled onclick="generateFromApprovedSelected()">
+                Generate &amp; Email Selected (0)
+              </button>
+            </div>
+            <div class="table-scroll" style="max-height: 310px;">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px;"></th>
+                    <th>Approved Applicant</th>
+                    <th>Student ID</th>
+                    <th>Program &amp; Year</th>
+                    <th>Division</th>
+                    <th>Accepted Date</th>
+                  </tr>
+                </thead>
+                <tbody id="portalUnprovisionedBody">
+                  <tr><td colspan="6" class="empty-row">Loading approved applicants...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Mode B: CSV Upload for Students Not in Registrations Table -->
+          <div id="portalGenCsvBox" style="display: none; padding: 1.25rem;">
+            <div class="portal-csv-dropzone">
+              <div>
+                <strong>Upload Student Roster CSV</strong>
+                <p class="cell-sub" style="margin: 0.25rem 0 0.75rem;">Required columns: <code>first_name, last_name, email</code> &bull; Optional: <code>student_id, year, program, division_type, division_name, accepted_date</code></p>
+                <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+                  <label class="btn-primary-navy" style="cursor: pointer; display: inline-flex; align-items: center;">
+                    Choose CSV File
+                    <input type="file" id="portalCsvFileInput" accept=".csv,text/csv" style="display: none;" onchange="handlePortalCsvFileSelect(event)" />
+                  </label>
+                  <button type="button" class="btn-sm" onclick="downloadPortalCsvTemplate()">Download CSV Template</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="portalCsvPreviewWrap" style="display: none; margin-top: 1.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <strong>CSV Import Preview</strong>
+                <button type="button" class="btn-primary-navy" id="btnGenerateFromCsv" onclick="generateFromCsvRows()">
+                  Generate &amp; Email Credentials
+                </button>
+              </div>
+              <div class="table-scroll" style="max-height: 260px;">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Student ID</th>
+                      <th>Division</th>
+                      <th>Accepted Date</th>
+                      <th>Validation</th>
+                    </tr>
+                  </thead>
+                  <tbody id="portalCsvPreviewBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Centralized Org Members Directory -->
+        <div class="table-container">
+          <div class="table-card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <h2 class="table-card-title">Centralized Org Members Directory</h2>
+              <span class="portal-code-pill" id="portalMembersTotalBadge">0 Total</span>
+            </div>
+            <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+              <input type="text" id="portalMemberSearch" class="form-control" style="width: 240px;" placeholder="Search Org ID, username, name..." oninput="loadProvisionedMembers(1)" />
+              <select id="portalMemberStatusFilter" class="form-control" style="width: 150px;" onchange="loadProvisionedMembers(1)">
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="revoked">Revoked</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Unique Org ID</th>
+                  <th>Username</th>
+                  <th>Member</th>
+                  <th>Division &amp; Program</th>
+                  <th>Accepted</th>
+                  <th>Status</th>
+                  <th>Executive Actions</th>
+                </tr>
+              </thead>
+              <tbody id="portalMembersBody">
+                <tr><td colspan="7" class="empty-row">Loading provisioned members...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBPANEL 2: External API Keys & Validation Audit Logs -->
+      <div class="portal-subpanel" id="portal-subpanel-apikeys" style="display: none;">
+        <div id="portalNewKeyRevealBox" class="portal-key-reveal-box" style="display: none;"></div>
+
+        <div class="table-container" style="margin-bottom: 1.5rem;">
+          <div class="table-card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <h2 class="table-card-title">External System API Keys</h2>
+              <p class="view-page-sub" style="margin-top: 0.2rem;">Issue scoped read-only API keys (<code>members:validate</code>) so other org systems can verify credentials without direct database access.</p>
+            </div>
+            <form onsubmit="createPortalApiKey(event)" style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+              <input type="text" id="portalApiKeyName" class="form-control" style="width: 230px;" placeholder="System name (e.g. Event Portal)" required />
+              <input type="number" id="portalApiKeyRate" class="form-control" style="width: 130px;" value="60" min="1" max="10000" title="Rate limit (requests per minute)" required />
+              <button type="submit" class="btn-primary-navy">+ Create API Key</button>
+            </form>
+          </div>
+          <div class="table-scroll">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>External System Name</th>
+                  <th>Key Prefix</th>
+                  <th>Rate Limit</th>
+                  <th>Last Used</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="portalApiKeysBody">
+                <tr><td colspan="6" class="empty-row">Loading API keys...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <div class="table-card-header">
+            <h2 class="table-card-title">Recent External Credential Validation Logs</h2>
+            <button type="button" class="btn-sm" onclick="loadPortalValidationLogs()">Refresh Logs</button>
+          </div>
+          <div class="table-scroll">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>API Key / System</th>
+                  <th>Org ID Attempted</th>
+                  <th>Username Attempted</th>
+                  <th>Outcome</th>
+                  <th>Client IP</th>
+                </tr>
+              </thead>
+              <tbody id="portalValidationLogsBody">
+                <tr><td colspan="6" class="empty-row">Loading validation logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBPANEL 3: Plug-and-Play SDKs, AI Agent Integration & Live Sandbox -->
+      <div class="portal-subpanel" id="portal-subpanel-sdk" style="display: none;">
+        <div class="portal-sdk-grid">
+          <div class="table-container" style="padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div>
+                <h2 class="table-card-title">AI Coding Agent Plug-and-Play Prompt</h2>
+                <p class="cell-sub">Paste this prompt into Antigravity, Cursor, Claude Code, OpenCode, or Copilot inside any external project folder.</p>
+              </div>
+              <button type="button" class="btn-primary-navy" onclick="copyPortalElementText('portalSnippetAiPrompt', 'AI Agent prompt copied!')">
+                Copy AI Agent Prompt
+              </button>
+            </div>
+            <pre class="portal-code-block" id="portalSnippetAiPrompt"></pre>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.25rem 0 0.5rem;">
+              <h3 class="dossier-subhead" style="margin: 0;">JavaScript / TypeScript SDK (Node 18+, Next.js, Express)</h3>
+              <button type="button" class="btn-sm" onclick="copyPortalElementText('portalSnippetJs', 'JS/TS SDK snippet copied!')">Copy JS Snippet</button>
+            </div>
+            <pre class="portal-code-block" id="portalSnippetJs"></pre>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.25rem 0 0.5rem;">
+              <h3 class="dossier-subhead" style="margin: 0;">Python 3.9+ SDK (FastAPI, Flask, Django)</h3>
+              <button type="button" class="btn-sm" onclick="copyPortalElementText('portalSnippetPy', 'Python SDK snippet copied!')">Copy Python Snippet</button>
+            </div>
+            <pre class="portal-code-block" id="portalSnippetPy"></pre>
+          </div>
+
+          <div class="table-container" style="padding: 1.25rem;">
+            <h2 class="table-card-title">Live External Validation Sandbox</h2>
+            <p class="cell-sub" style="margin-bottom: 1rem;">Test <code>POST /api/v1/external/validate</code> directly with an active API Key and member credentials.</p>
+            <form onsubmit="runPortalSandboxValidation(event)">
+              <div class="form-group">
+                <label>X-API-Key Header</label>
+                <input type="text" id="sandboxApiKey" class="form-control" placeholder="sbg_live_..." required />
+              </div>
+              <div class="form-group">
+                <label>Member Org ID</label>
+                <input type="text" id="sandboxOrgId" class="form-control" placeholder="AWSSBG-1120-001" required />
+              </div>
+              <div class="form-group">
+                <label>Member Username</label>
+                <input type="text" id="sandboxUsername" class="form-control" placeholder="j.delacruz482" required />
+              </div>
+              <div class="form-group">
+                <label>Member Password</label>
+                <input type="password" id="sandboxPassword" class="form-control" placeholder="••••••••••••" required />
+              </div>
+              <button type="submit" class="btn-primary-navy" style="width: 100%;">Run Read-Only Validation Test</button>
+            </form>
+            <pre class="portal-code-block" id="sandboxResultOutput" style="display: none; margin-top: 1rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Email Preview & Confirmation Modal -->
@@ -712,6 +985,7 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <script defer src="../js/admin.js?v=ats-clean-20261119"></script>
+  <script defer src="../js/admin-portal.js?v=exec-portal-20261120b"></script>
 </body>
 
 </html>

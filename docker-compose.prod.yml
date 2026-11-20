@@ -1,0 +1,23 @@
+# Production override for AWS EC2 (awssbgjru.me)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+services:
+  backend:
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/migsrvr/awssbgjru}-backend:${IMAGE_TAG:-latest}
+    build: !reset null
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      - APP_BASE_URL=${APP_BASE_URL:-https://awssbgjru.me}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://awssbgjru.me,https://www.awssbgjru.me}
+
+  web:
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/migsrvr/awssbgjru}-web:${IMAGE_TAG:-latest}
+    build: !reset null
+    environment:
+      - DOMAIN=${DOMAIN:-awssbgjru.me}
+      - WWW_DOMAIN=${WWW_DOMAIN:-www.awssbgjru.me}
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"

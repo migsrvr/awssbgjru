@@ -86,6 +86,21 @@ DEFAULT_TEMPLATES = {
         "variables": ["Applicant Name"],
         "version": 1,
     },
+    "portal_credentials": {
+        "name": "Member Portal Credentials",
+        "subject": "Your AWS SBG JRU Official Member Portal Credentials",
+        "body": (
+            "Hi {{Applicant Name}},\n\n"
+            "Welcome to the AWS Student Builder Group – JRU Chapter! Your official centralized member portal credentials have been generated:\n\n"
+            "• Unique Org ID: {{Org ID}}\n"
+            "• Username: {{Username}}\n"
+            "• Temporary Password: {{Default Password}}\n\n"
+            "Please keep these credentials secure. You can use them across official AWS SBG JRU portals and member systems.\n\n"
+            "Regards,\nAWS SBG JRU Executive Team"
+        ),
+        "variables": ["Applicant Name", "Org ID", "Username", "Default Password"],
+        "version": 1,
+    },
 }
 
 
@@ -534,19 +549,21 @@ def send_email(
     template_id: Optional[str] = None,
     template_version: int = 1,
     sender_id: Optional[str] = None,
+    log_body: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Sends email via SMTP using MIME multipart (plain-text + HTML + inline CID images).
     Falls back to dry_run logging if SMTP credentials are missing.
-    Records delivery status in `email_logs` table.
+    Records delivery status in `email_logs` table (using `log_body` if provided to redact sensitive secrets).
     """
     delivery_status = "sent"
     error_message = None
+    safe_log_body = log_body if log_body is not None else body
 
     # Check if SMTP credentials exist
     if not EMAIL_USER or not EMAIL_PASS:
         delivery_status = "dry_run"
-        print(f"[EMAIL DRY RUN] To: {recipient_email}\nSubject: {subject}\n\n{body}\n")
+        print(f"[EMAIL DRY RUN] To: {recipient_email}\nSubject: {subject}\n\n{safe_log_body}\n")
     else:
         try:
             msg = _package_email_message(subject, body, html_body, recipient_email)
@@ -570,7 +587,7 @@ def send_email(
             "template_version": template_version,
             "recipient_email": recipient_email,
             "subject": subject,
-            "body": body,
+            "body": safe_log_body,
             "sender_id": sender_id,
             "delivery_status": delivery_status,
             "error_message": error_message,

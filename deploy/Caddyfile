@@ -1,0 +1,77 @@
+# Canonical www -> apex redirect (in production set DOMAIN=awssbgjru.me and WWW_DOMAIN=www.awssbgjru.me)
+{$WWW_DOMAIN:http://www.localhost} {
+	redir https://{$DOMAIN:localhost}{uri} permanent
+}
+
+{$DOMAIN:http://localhost} {
+	root * /srv/frontend
+	encode zstd gzip
+
+	# Security & basic hardening headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# 1. Captain Hima SSE streaming endpoint (disable proxy buffering for instant token stream)
+	handle /api/chat {
+		reverse_proxy backend:8001 {
+			flush_interval -1
+			transport http {
+				read_timeout 90s
+			}
+		}
+	}
+
+	# 2. All other FastAPI endpoints (90s read_timeout accommodates Groq AI ATS resume evaluation)
+	handle /api/* {
+		reverse_proxy backend:8001 {
+			transport http {
+				read_timeout 90s
+			}
+		}
+	}
+
+	# 2b. Plug-and-play SDKs and AI-Agent integration guides (/sdk/js/*, /sdk/python/*, /sdk/llms.txt, /sdk/AGENT_SKILL.md)
+	handle /sdk/* {
+		root * /srv
+		header Access-Control-Allow-Origin "*"
+		header Cache-Control "public, max-age=300"
+		file_server
+	}
+
+	# 3. Explicit content-type routes from vercel.json
+	handle /sitemap.xml {
+		header Content-Type "application/xml"
+		rewrite * /sitemap.xml
+		file_server
+	}
+
+	handle /robots.txt {
+		header Content-Type "text/plain; charset=utf-8"
+		rewrite * /robots.txt
+		file_server
+	}
+
+	# 4. Clean URL rewrites matching vercel.json
+	handle {
+		@root path /
+		rewrite @root /pages/landing-page.html
+
+		@clean_pages path_regexp page ^/(landing-page|register|explanation|department|office|skillbuilder|loading|waiting-approval|members|about|events|partners|achievements|contact|event-detail|admin|revision)(?:\.html)?$
+		rewrite @clean_pages /pages/{re.page.1}.html
+
+		try_files {path} /pages{path}.html /pages{path}
+		file_server
+	}
+
+	# 5. Custom 404 fallback page
+	handle_errors {
+		@404 expression `{err.status_code} == 404`
+		handle @404 {
+			rewrite * /pages/404.html
+			file_server
+		}
+	}
+}

@@ -1,0 +1,83 @@
+# AWS SBG JRU Centralized Member Validation API — LLM & AI Agent Integration Guide
+
+> Machine-readable integration specification for AI coding agents (Antigravity, Cursor, Claude Code, OpenCode, GitHub Copilot).
+
+## Overview
+- **Base URL (Production)**: `https://awssbgjru.me`
+- **Base URL (Same-EC2 Internal Docker Network)**: `http://awssbgjru-backend:8001`
+- **Scoped OpenAPI 3.1 Spec**: `GET https://awssbgjru.me/api/v1/external/openapi.json`
+- **Health Check**: `GET https://awssbgjru.me/api/v1/external/health`
+- **Validation Endpoint**: `POST https://awssbgjru.me/api/v1/external/validate`
+
+## Mandatory Security Invariants for AI Agents
+1. **Server-Side Only**: Always call `/api/v1/external/validate` from a backend route / server action. NEVER bundle `AWSSBG_API_KEY` into client-side browser code.
+2. **Environment Variables**: Read `AWSSBG_API_URL` (default `https://awssbgjru.me`) and `AWSSBG_API_KEY` (`sbg_live_...`) from environment variables.
+3. **Zero Password Logging**: Never log `password` in server logs or error trackers. Never pass credentials in URL query parameters.
+
+## Plug-and-Play Single-File SDK Downloads (Zero Dependencies)
+
+### JavaScript / TypeScript (Node 18+, Next.js, Express, Bun)
+```bash
+curl -fsSL https://awssbgjru.me/sdk/js/awssbg-auth-sdk.js -o awssbg-auth-sdk.js
+curl -fsSL https://awssbgjru.me/sdk/js/awssbg-auth-sdk.d.ts -o awssbg-auth-sdk.d.ts
+```
+
+### Python 3.9+ (FastAPI, Flask, Django)
+```bash
+curl -fsSL https://awssbgjru.me/sdk/python/awssbg_auth_sdk.py -o awssbg_auth_sdk.py
+```
+
+## HTTP Contract: `POST /api/v1/external/validate`
+
+### Request Headers
+```http
+Content-Type: application/json
+X-API-Key: sbg_live_<your_secret_key>
+```
+
+### Request Body
+```json
+{
+  "org_id": "AWSSBG-1120-001",
+  "username": "j.delacruz482",
+  "password": "member-password"
+}
+```
+
+### Response (`200 OK` — Valid Member)
+```json
+{
+  "valid": true,
+  "reason": null,
+  "member": {
+    "org_id": "AWSSBG-1120-001",
+    "username": "j.delacruz482",
+    "first_name": "Juan",
+    "last_name": "Dela Cruz",
+    "full_name": "Juan Dela Cruz",
+    "email": "juan.delacruz@my.jru.edu",
+    "student_id": "24-123456",
+    "year": "Third Year",
+    "program": "BS Information Technology",
+    "division_type": "skillbuilder",
+    "division_name": "Cloud Computing",
+    "status": "active",
+    "must_change_password": true
+  }
+}
+```
+
+### Response (`200 OK` — Invalid Credentials or Suspended Member)
+```json
+{
+  "valid": false,
+  "reason": "invalid_credentials",
+  "member": null
+}
+```
+*(Note: `reason` is `"invalid_credentials"` for any ID/username/password mismatch, or `"inactive_member"` if the member is suspended/revoked.)*
+
+### Error Status Codes
+- `401 Unauthorized`: Missing, invalid, or revoked `X-API-Key`.
+- `422 Unprocessable Entity`: Missing `org_id`, `username`, or `password` in JSON body.
+- `429 Too Many Requests`: Per-key rate limit exceeded.

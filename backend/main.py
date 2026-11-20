@@ -12,18 +12,20 @@ if _api_dir not in sys.path:
     sys.path.insert(0, _api_dir)
 
 from backend.api.chatbot import generate
-from backend.api.config import GROQ_MODEL
+from backend.api.config import ALLOWED_ORIGINS, GROQ_MODEL
 from backend.api.rate_limiter import RateLimiter
 from backend.api.cache import TTLCache
 from backend.routers.registration import router as registration_router
 from backend.routers.admin import router as admin_router
 from backend.routers.revision import router as revision_router
+from backend.routers.portal_admin import router as portal_admin_router
+from backend.routers.external_api import router as external_api_router
 
 app = FastAPI(title="AWS Student Builder Group - JRU API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://localhost:8001", "http://localhost:8080", "http://localhost:8081", "http://127.0.0.1:8000", "http://127.0.0.1:8001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -31,6 +33,8 @@ app.add_middleware(
 app.include_router(registration_router)
 app.include_router(admin_router)
 app.include_router(revision_router)
+app.include_router(portal_admin_router)
+app.include_router(external_api_router)
 
 
 limiter = RateLimiter()

@@ -1,0 +1,31 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+WORKDIR /app
+
+# Create non-root user for security
+RUN groupadd --gid 1001 appgroup && \
+    useradd --uid 1001 --gid appgroup --shell /bin/bash --create-home appuser
+
+# Install lightweight production dependencies (Groq + pypdf + Supabase + FastAPI, no PyTorch/FAISS)
+COPY backend/requirements-docker.txt /app/backend/requirements-docker.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /app/backend/requirements-docker.txt
+
+# Copy backend application and frontend/assets (required by email_service.py for inline CID banners & QR PNGs)
+COPY backend /app/backend
+COPY frontend/assets /app/frontend/assets
+
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=4)" || exit 1
+
+# Single async worker preserves in-memory sync_service, RateLimiter, and TTLCache consistency while minimizing RAM on t3.micro
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]

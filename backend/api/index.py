@@ -26,6 +26,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from backend.routers.admin import router as admin_router
 from backend.routers.revision import router as revision_router
+from backend.routers.portal_admin import router as portal_admin_router
+from backend.routers.external_api import router as external_api_router
 from backend.services.application_service import get_system_settings
 from backend.services.sync_service import bump_sync_version
 
@@ -45,6 +47,8 @@ app.add_middleware(
 
 app.include_router(admin_router)
 app.include_router(revision_router)
+app.include_router(portal_admin_router)
+app.include_router(external_api_router)
 
 
 limiter = rate_limiter.RateLimiter()

@@ -2477,3 +2477,144 @@ html.admin-authenticated #adminMainContent {
     height: 540px;
   }
 }
+
+/* ============================================================================
+   Executive Portal & External Validation API Styles
+   ============================================================================ */
+
+.portal-exec-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, #232f3e, #0f172a);
+  color: #ff9900;
+  border: 1px solid rgba(255, 153, 0, 0.35);
+}
+
+.portal-subtab-strip,
+.portal-genmode-strip {
+  display: inline-flex;
+  background: var(--bg-input);
+  padding: 0.28rem;
+  border-radius: 12px;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.portal-subtab-btn,
+.portal-genmode-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.48rem 0.9rem;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.portal-subtab-btn.active,
+.portal-genmode-btn.active {
+  background: var(--navy);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.14);
+}
+
+.portal-code-pill {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--bg-input);
+  color: var(--navy-deep);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.portal-csv-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 1.75rem 1.25rem;
+  text-align: center;
+}
+
+.portal-batch-banner,
+.portal-key-reveal-box {
+  background: #ffffff;
+  border: 1.5px solid var(--aws-orange);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 4px 14px rgba(255, 153, 0, 0.1);
+}
+
+.portal-batch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.portal-batch-errors {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  background: var(--accent-red-bg);
+  color: var(--accent-red);
+  font-size: 0.82rem;
+}
+
+.portal-key-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.portal-key-copy-row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  user-select: all;
+}
+
+.portal-sdk-grid {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.portal-code-block {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  padding: 0.95rem 1.05rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .portal-sdk-grid {
+    grid-template-columns: 1fr;
+  }
+}

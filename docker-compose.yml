@@ -1,0 +1,47 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: awssbgjru-backend
+    restart: unless-stopped
+    env_file:
+      - path: backend/api/.env
+        required: false
+    environment:
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8080}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://awssbgjru.me,https://www.awssbgjru.me,http://localhost:8080,http://localhost:8000}
+    expose:
+      - "8001"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: awssbgjru-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - DOMAIN=${DOMAIN:-http://localhost}
+      - WWW_DOMAIN=${WWW_DOMAIN:-http://www.localhost}
+    ports:
+      - "${WEB_HTTP_PORT:-8080}:80"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+  caddy_config:

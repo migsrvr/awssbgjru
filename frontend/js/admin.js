@@ -261,7 +261,7 @@ function checkAuth() {
   const hadWarmCache = restoreAdminCache();
 
   // Restore view from URL hash or previous session (supports #review/<id>)
-  const validViews = ["dashboard", "queue", "departments", "templates", "settings", "audit"];
+  const validViews = ["dashboard", "queue", "departments", "templates", "settings", "audit", "portal"];
   const hash = window.location.hash.replace("#", "").trim();
   const reviewMatch = hash.match(/^review\/(\d+)$/);
   if (reviewMatch) {
@@ -390,9 +390,23 @@ function renderUserHeader() {
   if (nameEl && state.user) nameEl.textContent = state.user.full_name;
   if (roleEl && state.user) roleEl.textContent = `(${state.user.role.toUpperCase()})`;
 
-  // Hide admin-only tabs if reviewer
-  if (state.user && state.user.role !== "administrator") {
-    document.querySelectorAll(".admin-only").forEach((el) => (el.style.display = "none"));
+  const isAdminOrExec = Boolean(
+    state.user && (state.user.role === "administrator" || state.user.role === "executive")
+  );
+  const isExecutive = Boolean(state.user && state.user.role === "executive");
+
+  // Show admin-only tabs to administrator & executive; hide for reviewer
+  document.querySelectorAll(".admin-only").forEach((el) => {
+    el.style.display = isAdminOrExec ? "" : "none";
+  });
+
+  // Show executive-only tabs strictly to executive; hide for reviewer & administrator
+  document.querySelectorAll(".executive-only").forEach((el) => {
+    el.style.display = isExecutive ? "" : "none";
+  });
+
+  if (!isExecutive && state.currentView === "portal") {
+    switchView("dashboard");
   }
 }
 
@@ -410,6 +424,11 @@ function initNav() {
 }
 
 function switchView(viewName) {
+  if (viewName === "portal" && (!state.user || state.user.role !== "executive")) {
+    showToast("Executive privileges required to access Portal & API.", "error");
+    viewName = "dashboard";
+  }
+
   state.currentView = viewName;
   localStorage.setItem("admin_active_view", viewName);
   window.location.hash = viewName;
@@ -429,6 +448,7 @@ function switchView(viewName) {
   else if (viewName === "templates") loadTemplates();
   else if (viewName === "settings") loadSettings();
   else if (viewName === "audit") loadAuditLogs();
+  else if (viewName === "portal" && typeof window.loadPortalView === "function") window.loadPortalView();
 }
 
 // ---------------- Background Preloader & Mutation Sync Watcher ----------------
