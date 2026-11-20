@@ -1,7 +1,9 @@
 import os
 import re
+import html as html_lib
 import base64
 import smtplib
+import time
 import datetime
 from email.message import EmailMessage
 from typing import Dict, Any, Optional, Tuple
@@ -540,6 +542,211 @@ def _package_email_message(
     return msg
 
 
+def _qr_web_path_if_exists(filename: str) -> Optional[str]:
+    """Returns '/assets/QRs/<filename>' only if the physical file exists under frontend/assets/QRs."""
+    assets_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "assets", "QRs")
+    )
+    if os.path.exists(os.path.join(assets_dir, filename)):
+        return f"/assets/QRs/{filename}"
+    return None
+
+
+def resolve_division_qr_asset(
+    division_name: Optional[str] = None,
+    division_type: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Resolves (general_qr_path, division_qr_path, division_chat_label) from database
+    department fields (`division_name`, `division_type`).
+    """
+    general_qr = _qr_web_path_if_exists("GeneralQR.png")
+    d = (division_name or "").strip()
+    dtype = (division_type or "").strip().lower()
+
+    if re.search(r"relation", d, re.I):
+        return general_qr, _qr_web_path_if_exists("RelationsQR.png"), "Relations Group Chat"
+
+    if re.search(r"operation", d, re.I):
+        return general_qr, _qr_web_path_if_exists("OperationalQR.png"), "Operations Group Chat"
+
+    if re.search(r"creative|media|design", d, re.I):
+        return general_qr, _qr_web_path_if_exists("CreativesQR.png"), "Creatives Group Chat"
+
+    is_tech = (
+        dtype == "skillbuilder"
+        or bool(
+            re.search(
+                r"tech|skill\s*builder|software|web\s*dev|ui\s*/?\s*ux|data\s*analy|cloud|machine\s*learning|\bai\b|\bml\b|network|infrastructure",
+                d,
+                re.I,
+            )
+        )
+    )
+    if is_tech:
+        tech_qr = _qr_web_path_if_exists("TechQR.jpeg") or _qr_web_path_if_exists("TechTeamQR.png")
+        return general_qr, tech_qr, "Tech Team Group Chat"
+
+    return general_qr, None, None
+
+
+def build_portal_credentials_html(
+    subject: str,
+    full_name: str,
+    org_id: str,
+    username: str,
+    plaintext_password: str,
+    division_name: Optional[str] = None,
+    division_type: Optional[str] = None,
+) -> str:
+    """
+    Builds a branded AWS SBG JRU HTML email (matching Relations' official layout)
+    with the AWS-Banner.png header, styled Member Portal Credentials card, and
+    auto-detected General + Department Group Chat QR codes (no footer banner).
+    """
+    resolved_header = resolve_image_url("/assets/email-banners/AWS-Banner.png")
+    general_qr, division_qr, division_label = resolve_division_qr_asset(division_name, division_type)
+    role_title, division_formatted, _ = resolve_applicant_role_and_division(
+        {"division_name": division_name or "AWS SBG JRU", "division_type": division_type or ""}
+    )
+
+    first_name = (full_name.strip().split() or ["Member"])[0]
+    esc_subject = html_lib.escape(subject)
+    esc_first = html_lib.escape(first_name)
+    esc_role = html_lib.escape(role_title)
+    esc_div = html_lib.escape(division_formatted)
+    esc_org_id = html_lib.escape(org_id)
+    esc_user = html_lib.escape(username)
+    esc_pw = html_lib.escape(plaintext_password)
+
+    qr_blocks = []
+    if general_qr:
+        qr_blocks.append(
+            '<div style="margin: 16px 0 20px 0;">'
+            '<p style="margin: 0 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; line-height: 1.55;">'
+            '<span style="color: #0c356a; font-weight: bold; font-style: italic;">General Group Chat:</span>'
+            '</p>'
+            f'<img src="{general_qr}" alt="General Group Chat QR Code" width="170" '
+            'style="width: 170px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #ffffff; display: block; margin-top: 8px;" />'
+            '</div>'
+        )
+    if division_qr and division_label:
+        esc_label = html_lib.escape(division_label)
+        qr_blocks.append(
+            '<div style="margin: 16px 0 20px 0;">'
+            '<p style="margin: 0 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; line-height: 1.55;">'
+            f'<span style="color: #0c356a; font-weight: bold; font-style: italic;">{esc_label}:</span>'
+            '</p>'
+            f'<img src="{division_qr}" alt="{esc_label} QR Code" width="170" '
+            'style="width: 170px; max-width: 100%; height: auto; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #ffffff; display: block; margin-top: 8px;" />'
+            '</div>'
+        )
+
+    qr_section_html = ""
+    if qr_blocks:
+        qr_section_html = (
+            '<p style="margin: 20px 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; color: #222222; line-height: 1.55;">'
+            'Please scan the QR code(s) below to join our official group chats and stay coordinated with the organization:'
+            '</p>'
+            + "".join(qr_blocks)
+        )
+
+    header_img_html = ""
+    if resolved_header:
+        header_img_html = f'''
+        <tr>
+          <td align="center" style="padding: 0;">
+            <img src="{resolved_header}" alt="AWS Student Builder Group JRU Chapter" width="600" style="width: 100%; max-width: 600px; height: auto; display: block; border-top-left-radius: 8px; border-top-right-radius: 8px;" />
+          </td>
+        </tr>
+        '''
+
+    division_line = (
+        f'We are pleased to welcome you as a <span style="color: #0c356a; font-weight: bold; font-style: italic;">{esc_role}</span> '
+        f'under the <span style="color: #0c356a; font-weight: bold; font-style: italic;">{esc_div}</span> of the '
+        f'<span style="color: #0c356a; font-weight: bold; font-style: italic;">AWS Student Builder Group &ndash; JRU Chapter</span>.'
+        if division_name
+        else 'Welcome to the <span style="color: #0c356a; font-weight: bold; font-style: italic;">AWS Student Builder Group &ndash; JRU Chapter</span>!'
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{esc_subject}</title>
+</head>
+<body style="margin: 0; padding: 20px 0; background-color: #f7fafc; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f7fafc;">
+    <tr>
+      <td align="center" style="padding: 10px;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+          {header_img_html}
+          <tr>
+            <td style="padding: 28px 30px 24px 30px; color: #222222; font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; line-height: 1.55;">
+              <p style="margin: 0 0 16px 0;"><span style="color: #0c356a; font-weight: bold; font-style: italic;">Dear {esc_first},</span></p>
+              <p style="margin: 0 0 16px 0;">{division_line}</p>
+              <p style="margin: 0 0 14px 0;">Your official centralized member portal credentials have been generated. You can use these across official AWS SBG JRU portals and member systems:</p>
+
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #0c356a; border-radius: 6px; margin: 16px 0 20px 0;">
+                <tr>
+                  <td style="padding: 16px 18px; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.7;">
+                    <div><strong style="color: #0c356a;">Unique Org ID:</strong> <span style="font-family: Consolas, Menlo, monospace; background: #e2e8f0; padding: 2px 7px; border-radius: 4px; font-weight: bold;">{esc_org_id}</span></div>
+                    <div><strong style="color: #0c356a;">Username:</strong> <span style="font-family: Consolas, Menlo, monospace; background: #e2e8f0; padding: 2px 7px; border-radius: 4px; font-weight: bold;">{esc_user}</span></div>
+                    <div><strong style="color: #0c356a;">Temporary Password:</strong> <span style="font-family: Consolas, Menlo, monospace; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; padding: 2px 7px; border-radius: 4px; font-weight: bold;">{esc_pw}</span></div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 16px 0; font-size: 13.5px; color: #475569;">Please keep these credentials confidential and do not share your password with anyone.</p>
+              {qr_section_html}
+              <p style="margin: 20px 0 0 0;">We look forward to learning and building with you!<br /><span style="color: #0c356a; font-weight: bold; font-style: italic;">AWS SBG JRU Executive Team</span></p>
+            </td>
+          </tr>
+        </table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; margin-top: 16px;">
+          <tr>
+            <td align="center" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #a0aec0; padding: 10px 20px; line-height: 1.4;">
+              AWS Student Builder Group &bull; Jose Rizal University Chapter<br>
+              <span style="font-size: 11px;">This is an official administrative communication from AWS SBG JRU.</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
+def _send_via_smtp(msg: EmailMessage) -> None:
+    """Sends an EmailMessage over SMTP_SSL (port 465) or STARTTLS (port 587) with 1 retry on disconnect."""
+    last_exc: Optional[Exception] = None
+    for attempt in range(2):
+        try:
+            if int(EMAIL_PORT) == 465:
+                with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, timeout=20) as smtp:
+                    smtp.ehlo()
+                    smtp.login(EMAIL_USER, EMAIL_PASS)
+                    smtp.send_message(msg)
+            else:
+                with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=20) as smtp:
+                    smtp.ehlo()
+                    smtp.starttls()
+                    smtp.ehlo()
+                    smtp.login(EMAIL_USER, EMAIL_PASS)
+                    smtp.send_message(msg)
+            return
+        except smtplib.SMTPServerDisconnected as exc:
+            last_exc = exc
+            if attempt == 0:
+                time.sleep(0.5)
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+
+
 def send_email(
     recipient_email: str,
     subject: str,
@@ -567,11 +774,7 @@ def send_email(
     else:
         try:
             msg = _package_email_message(subject, body, html_body, recipient_email)
-
-            with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=15) as smtp:
-                smtp.starttls()
-                smtp.login(EMAIL_USER, EMAIL_PASS)
-                smtp.send_message(msg)
+            _send_via_smtp(msg)
             print(f"[EMAIL SENT] Successfully sent email with inline graphics to {recipient_email}")
         except Exception as e:
             delivery_status = "failed"

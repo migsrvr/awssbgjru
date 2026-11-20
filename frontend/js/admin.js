@@ -1548,6 +1548,7 @@ const QR_ASSETS = {
   relations: "/assets/QRs/RelationsQR.png",
   operations: "/assets/QRs/OperationalQR.png",
   creatives: "/assets/QRs/CreativesQR.png",
+  tech: "/assets/QRs/TechQR.jpeg",
 };
 
 const qrDataUrlCache = {};
@@ -1598,6 +1599,12 @@ function getDivisionQrConfig(divName) {
     return {
       path: QR_ASSETS.creatives,
       label: "Creatives QR Attached",
+    };
+  }
+  if (/tech|skill\s*builder|software|web\s*dev|ui\s*\/?\s*ux|data\s*analy|cloud|machine\s*learning|\bai\b|\bml\b|network|infrastructure/i.test(d)) {
+    return {
+      path: QR_ASSETS.tech,
+      label: "Tech Team QR Attached",
     };
   }
   return null;
