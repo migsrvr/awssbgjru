@@ -4,7 +4,13 @@ import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from backend.auth import OfficerUser, require_reviewer, require_admin
+from backend.auth import (
+    OfficerUser,
+    authenticate_builtin_executive,
+    create_executive_token,
+    require_reviewer,
+    require_admin,
+)
 from backend.api.config import SUPABASE_SERVICE_ROLE_KEY
 from backend.database import get_supabase_admin, get_supabase_auth_client
 from backend.schemas.admin import (
@@ -50,7 +56,21 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 @router.post("/auth/login", response_model=LoginResponse)
 def login_endpoint(payload: LoginRequest):
-    """Authenticates an officer via Supabase Auth and validates their role in admin_users."""
+    """Authenticates either the built-in .env Executive account or an officer via Supabase Auth."""
+    builtin_exec = authenticate_builtin_executive(payload.email, payload.password)
+    if builtin_exec is not None:
+        exec_token = create_executive_token(builtin_exec)
+        return LoginResponse(
+            access_token=exec_token,
+            token_type="bearer",
+            user=OfficerResponse(
+                id=builtin_exec.id,
+                email=builtin_exec.email,
+                full_name=builtin_exec.full_name,
+                role=builtin_exec.role,
+            ),
+        )
+
     if not SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(
             status_code=500,

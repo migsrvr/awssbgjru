@@ -74,3 +74,10 @@ EMAIL_USER = os.getenv("EMAIL_USER", "")
 EMAIL_PASS = os.getenv("EMAIL_PASS", "")
 NOTIFY_EMAIL = os.getenv("NOTIFY_EMAIL", "")
 
+# Built-in Executive Account (optional — configured via server .env, zero Supabase setup required)
+EXECUTIVE_USERNAME = os.getenv("EXECUTIVE_USERNAME", "").strip()
+EXECUTIVE_PASSWORD = os.getenv("EXECUTIVE_PASSWORD", "")
+EXECUTIVE_FULL_NAME = os.getenv("EXECUTIVE_FULL_NAME", "AWS SBG Executive").strip() or "AWS SBG Executive"
+EXECUTIVE_SECRET = os.getenv("EXECUTIVE_SECRET", "")
+EXECUTIVE_SESSION_TTL_HOURS = int(os.getenv("EXECUTIVE_SESSION_TTL_HOURS", "12"))
+

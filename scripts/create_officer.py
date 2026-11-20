@@ -1,6 +1,7 @@
 import sys
 import argparse
 from pathlib import Path
+from typing import Any, Dict, List, cast
 
 # Ensure root directory is on sys.path
 root_dir = Path(__file__).resolve().parent.parent
@@ -12,7 +13,7 @@ from backend.database import get_supabase_admin
 
 def list_officers(client):
     res = client.table("admin_users").select("*").order("created_at").execute()
-    rows = res.data or []
+    rows = cast(List[Dict[str, Any]], res.data or [])
     if not rows:
         print("\nNo officers registered in 'admin_users' yet.\n")
         return
@@ -34,8 +35,8 @@ def create_or_update_officer(email: str, password: str, name: str, role: str):
     name = name.strip()
     role = role.strip().lower()
 
-    if role not in ("reviewer", "administrator"):
-        print(f"Error: Invalid role '{role}'. Must be 'reviewer' or 'administrator'.")
+    if role not in ("reviewer", "administrator", "executive"):
+        print(f"Error: Invalid role '{role}'. Must be 'reviewer', 'administrator', or 'executive'.")
         sys.exit(1)
 
     if len(password) < 6:
@@ -83,9 +84,10 @@ def create_or_update_officer(email: str, password: str, name: str, role: str):
     # Fallback: if user_id not found via admin API, check if admin_users already has this email
     if not user_id:
         existing = client.table("admin_users").select("id").eq("email", email).execute()
-        if existing.data and len(existing.data) > 0:
-            user_id = existing.data[0]["id"]
-        else:
+        existing_rows = cast(List[Dict[str, Any]], existing.data or [])
+        if existing_rows:
+            user_id = str(existing_rows[0].get("id") or "")
+        if not user_id:
             import uuid
             user_id = str(uuid.uuid4())
 
@@ -119,7 +121,7 @@ def main():
     parser.add_argument("--email", help="Officer email address")
     parser.add_argument("--password", help="Officer password")
     parser.add_argument("--name", help="Officer full name")
-    parser.add_argument("--role", default="administrator", choices=["reviewer", "administrator"], help="Officer role (default: administrator)")
+    parser.add_argument("--role", default="administrator", choices=["reviewer", "administrator", "executive"], help="Officer role (default: administrator)")
     parser.add_argument("--list", action="store_true", help="List all registered officers")
 
     args = parser.parse_args()
@@ -154,9 +156,11 @@ def main():
             return
 
     if not args.email:  # only prompt role if running interactively
-        role_input = input("Role (1: administrator, 2: reviewer) [default: 1]: ").strip()
+        role_input = input("Role (1: administrator, 2: reviewer, 3: executive) [default: 1]: ").strip()
         if role_input == "2":
             role = "reviewer"
+        elif role_input == "3":
+            role = "executive"
         else:
             role = "administrator"
 

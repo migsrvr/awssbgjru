@@ -58,6 +58,13 @@ class RewriteHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(405)
             self.end_headers()
 
+    def do_PATCH(self):
+        if self.path.startswith("/api/"):
+            self._proxy_api()
+        else:
+            self.send_response(405)
+            self.end_headers()
+
     def do_DELETE(self):
         if self.path.startswith("/api/"):
             self._proxy_api()
