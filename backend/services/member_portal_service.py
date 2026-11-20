@@ -30,7 +30,12 @@ from backend.services.credential_service import (
     split_full_name,
     verify_password,
 )
-from backend.services.email_service import get_template, interpolate_template, send_email
+from backend.services.email_service import (
+    build_portal_credentials_html,
+    get_template,
+    interpolate_template,
+    send_email,
+)
 
 _EMAIL_REGEX = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -77,10 +82,12 @@ def _dispatch_credential_email(
     plaintext_password: str,
     sender_id: str,
     registration_id: Optional[int] = None,
+    division_name: Optional[str] = None,
+    division_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Sends the member's credentials via SMTP and logs a REDACTED body (`[REDACTED]`)
-    to `email_logs` so plaintext passwords never persist in database logs.
+    Sends the member's branded HTML credentials email (with AWS header banner + auto-detected
+    General & Department QR codes) via SMTP and logs a REDACTED body (`[REDACTED]`) to `email_logs`.
     """
     template = get_template("portal_credentials")
     base_vars = {
@@ -97,11 +104,21 @@ def _dispatch_credential_email(
         template,
         {**base_vars, "Default Password": "[REDACTED]"},
     )
+    html_body = build_portal_credentials_html(
+        subject=real_subject,
+        full_name=full_name,
+        org_id=org_id,
+        username=username,
+        plaintext_password=plaintext_password,
+        division_name=division_name,
+        division_type=division_type,
+    )
 
     return send_email(
         recipient_email=recipient_email,
         subject=real_subject,
         body=real_body,
+        html_body=html_body,
         registration_id=registration_id,
         template_id="portal_credentials",
         template_version=template.get("version", 1),
@@ -265,6 +282,8 @@ def bulk_generate_from_approved(
             plaintext_password=temp_password,
             sender_id=officer_id,
             registration_id=reg_id,
+            division_name=reg.get("division_name"),
+            division_type=reg.get("division_type"),
         )
         # Clear transient plaintext reference immediately
         del temp_password
@@ -400,6 +419,8 @@ def bulk_generate_from_csv(
             plaintext_password=temp_password,
             sender_id=officer_id,
             registration_id=None,
+            division_name=cast(Optional[str], insert_row.get("division_name")),
+            division_type=cast(Optional[str], insert_row.get("division_type")),
         )
         del temp_password
 
@@ -543,6 +564,8 @@ def reset_and_email_member_password(
         plaintext_password=temp_password,
         sender_id=officer_id,
         registration_id=member.get("registration_id"),
+        division_name=member.get("division_name"),
+        division_type=member.get("division_type"),
     )
     del temp_password
 

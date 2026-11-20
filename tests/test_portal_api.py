@@ -436,3 +436,47 @@ def test_builtin_env_executive_login_and_token_verification(client, monkeypatch)
         headers={"Authorization": f"Bearer {token}"},
     )
     assert disabled_res.status_code == 401
+
+
+def test_branded_portal_email_and_department_qr_autodetection():
+    from backend.services.email_service import (
+        resolve_division_qr_asset,
+        build_portal_credentials_html,
+        _package_email_message,
+    )
+
+    # 1. Tech Team / Skill Builder resolves TechQR.jpeg
+    gen_qr, div_qr, label = resolve_division_qr_asset("Cloud Computing", "skillbuilder")
+    assert gen_qr == "/assets/QRs/GeneralQR.png"
+    assert div_qr == "/assets/QRs/TechQR.jpeg"
+    assert label == "Tech Team Group Chat"
+
+    # 2. Relations / Operations / Creatives resolve their exact QR files
+    assert resolve_division_qr_asset("Relations Office", "office")[1] == "/assets/QRs/RelationsQR.png"
+    assert resolve_division_qr_asset("Operations", "office")[1] == "/assets/QRs/OperationalQR.png"
+    assert resolve_division_qr_asset("Media", "office")[1] == "/assets/QRs/CreativesQR.png"
+
+    # 3. Branded HTML includes AWS-Banner.png, credentials, GeneralQR.png, TechQR.jpeg, and NO footer banner
+    html = build_portal_credentials_html(
+        subject="Your AWS SBG JRU Official Member Portal Credentials",
+        full_name="Juan Dela Cruz",
+        org_id="AWSSBG-1120-001",
+        username="j.delacruz482",
+        plaintext_password="TempPw!99",
+        division_name="Software Development",
+        division_type="skillbuilder",
+    )
+    assert "AWS-Banner.png" in html
+    assert "AWSSBG-1120-001" in html
+    assert "j.delacruz482" in html
+    assert "TempPw!99" in html
+    assert "/assets/QRs/GeneralQR.png" in html
+    assert "/assets/QRs/TechQR.jpeg" in html
+    assert "Officer Sign-off" not in html
+
+    # 4. MIME packager converts header banner + both QRs to inline cid: attachments
+    msg = _package_email_message("Test Subject", "Plain fallback", html, "student@my.jru.edu")
+    html_part = msg.get_payload()[1]
+    related_parts = html_part.get_payload()
+    # 1 HTML body + 3 inline images (AWS-Banner.png, GeneralQR.png, TechQR.jpeg)
+    assert len(related_parts) == 4

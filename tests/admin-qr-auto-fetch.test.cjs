@@ -35,6 +35,7 @@ test("QR_ASSETS contains expected static asset paths", () => {
   assert.equal(QR_ASSETS.relations, "/assets/QRs/RelationsQR.png");
   assert.equal(QR_ASSETS.operations, "/assets/QRs/OperationalQR.png");
   assert.equal(QR_ASSETS.creatives, "/assets/QRs/CreativesQR.png");
+  assert.equal(QR_ASSETS.tech, "/assets/QRs/TechQR.jpeg");
 });
 
 test("all referenced QR asset files physically exist on disk in frontend/assets/QRs", () => {
@@ -80,16 +81,31 @@ test("getDivisionQrConfig correctly maps Creatives and Media division variants",
   }
 });
 
-test("getDivisionQrConfig returns null for divisions without pre-defined QR files", () => {
+test("getDivisionQrConfig correctly maps Tech Team and Skill Builder division variants", () => {
   const cases = [
     "Technology",
-    "Marketing",
-    "Finance",
+    "Tech Team",
     "Software Development",
     "Web Development",
+    "Software & Web Dev.",
     "UI/UX",
     "Cloud Computing",
     "Data Analyst",
+    "Machine Learning & AI",
+    "Advanced Network & Infrastructure",
+  ];
+  for (const div of cases) {
+    const config = getDivisionQrConfig(div);
+    assert.ok(config, `Should resolve Tech Team QR config for ${div}`);
+    assert.equal(config.path, "/assets/QRs/TechQR.jpeg");
+    assert.equal(config.label, "Tech Team QR Attached");
+  }
+});
+
+test("getDivisionQrConfig returns null for divisions without pre-defined QR files", () => {
+  const cases = [
+    "Marketing",
+    "Finance",
     "",
     null,
     undefined,

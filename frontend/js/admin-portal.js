@@ -182,7 +182,12 @@ async function generateFromApprovedSelected() {
 
     portalState.lastBatchResult = data;
     renderBatchSummaryBanner();
-    showToast(`Generated ${data.generated_count} member credentials & dispatched emails!`, "success");
+    if (data.emailed_count < data.generated_count) {
+      const failedMail = data.generated_count - data.emailed_count;
+      showToast(`Generated ${data.generated_count} member(s), but ${failedMail} email(s) failed to send. Check SMTP settings or use Reset & Email PW.`, "error");
+    } else {
+      showToast(`Generated ${data.generated_count} member credentials & dispatched emails!`, "success");
+    }
     await Promise.all([loadUnprovisionedApproved(), loadProvisionedMembers()]);
   } catch (err) {
     showToast(err.message || "Error generating credentials", "error");
@@ -344,7 +349,12 @@ async function generateFromCsvRows() {
     if (fileInput) fileInput.value = "";
     renderCsvPreviewTable();
     renderBatchSummaryBanner();
-    showToast(`Generated ${data.generated_count} member(s) from CSV & emailed credentials!`, "success");
+    if (data.emailed_count < data.generated_count) {
+      const failedMail = data.generated_count - data.emailed_count;
+      showToast(`Generated ${data.generated_count} member(s) from CSV, but ${failedMail} email(s) failed to send.`, "error");
+    } else {
+      showToast(`Generated ${data.generated_count} member(s) from CSV & emailed credentials!`, "success");
+    }
     await loadProvisionedMembers();
   } catch (err) {
     showToast(err.message || "CSV generation error", "error");
